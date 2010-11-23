@@ -1,0 +1,77 @@
+#!/bin/sh
+
+# makelist - List of all Makefiles to be built.
+makelist="Makefile"
+config="src/config.h"
+
+unset host
+
+for opt in "$@"
+do
+	if [ -z "$optname" ] ; then
+		if [ "$opt" != "${opt%%=*}" ] ; then
+			optname=${opt%%=*}
+			opt=${opt#*=} 
+		else
+			optname="$opt"
+			unset opt
+		fi
+	fi
+
+	case "$optname" in
+		--build)
+			test -z "$opt" && continue || build="$opt" ;;
+		--host)
+			test -z "$opt" && continue || host="$opt" ;;
+		*)
+			echo "invalid option $optname"
+			exit 1
+			;;
+	esac
+
+	unset optname
+done
+
+test ! -z $optname && echo "$optname requires parameter" && exit
+
+unset CONFDECL
+
+cat <<EOF > "$config"
+#ifndef CONFIG_H
+#define CONFIG_H
+EOF
+
+for script in mktests/[0-9][0-9]*
+do
+	rm -f mktests/tmp*
+	. $script || exit $?
+done
+rm -f mktests/tmp*
+
+reconf="$0"
+for param in "$@" ; do reconf="$reconf '$param'" ; done
+echo "$reconf" > reconfigure
+
+for make in $makelist
+do
+	if [ -e "$make" ] ; then
+		if ! rm -f "$make" < /dev/null > /dev/null 2> /dev/null ; then
+			echo Unable to remove "$make"
+			exit
+		fi
+	fi
+
+	cat <<EOF > "$make"
+#configure
+conf_clean = rm $makelist $config
+CONF_CFLAGS = 
+CONF_LDFLAGS = 
+conf_reconfigure = $reconf
+$CONFDECL
+#endconfigure
+EOF
+
+	cat "$make.in" >> "$make"
+done
+
+echo "#endif" >> "$config"

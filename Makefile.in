@@ -1,0 +1,36 @@
+PREFIX	= $(HOME)
+CFLAGS	= -O2 -Wall -Werror -I$(PREFIX)/include $(CONF_CFLAGS)
+LDFLAGS = -lerm -lclip -L$(PREFIX)/lib -Wl,-rpath=$(PREFIX)/lib $(CONF_LDFLAGS)
+SOURCE	= src/lex.o src/main.o src/parse.o src/symbol.o src/symtable.o src/token.o src/types.o
+CC	= $(CONF_CC)
+LD	= $(CONF_LD)
+DEPDIRS = src/deps
+
+all: sci
+
+sci: $(SOURCE)
+	$(LD) $(LDFLAGS) $^ -o $@
+
+sinclude src/deps/*
+
+%.o: %.c Makefile
+	@if [ ! -d "$(@D)/deps" ] ; then mkdir "$(@D)/deps" ; fi
+	$(CC) $(CFLAGS) -MD -MP -MF $(@D)/deps/$(@F).dep -c $< -o $@
+
+clean:
+	rm -f src/*.o
+
+maintainer-clean: clean
+	$(conf_clean)
+	rm -rf $(DEPDIRS)
+
+Makefile: Makefile.in configure
+	@echo "rebuilding makefile"
+	$(conf_reconfigure)
+
+Makefile.in:
+
+configure: mktests/*
+	@touch configure
+
+.PHONY: all clean maintainer-clean

@@ -1,0 +1,14 @@
+#!/bin/sh
+
+fail="build environment is grinning and holding a spatula, guess not"
+
+echo -n "sanity check... "
+
+echo "int main() { return 0; }" > mktests/tmp.c
+test -f mktests/tmp.c || echo "$fail" || return 1
+$cc mktests/tmp.c -o mktests/tmp.out || (rm mktests/tmp* ; echo "$fail") || return 1
+test -f mktests/tmp.out || (rm mktests/tmp* ; echo "$fail") || return 1
+
+rm -f mktests/tmp*
+
+echo "okay"
