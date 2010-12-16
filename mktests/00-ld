@@ -15,6 +15,6 @@ else
 	fi
 fi
 
-CONFDECL="$CONFDECL\
-CONF_LD = $ld
+BMAKE_DECL="$BMAKE_DECL\
+bmake_LD = $ld
 "

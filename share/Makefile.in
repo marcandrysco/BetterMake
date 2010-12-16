@@ -1,15 +1,11 @@
-PREFIX	= $(HOME)
-CFLAGS	= -O2 -Wall -Werror -I$(PREFIX)/include $(CONF_CFLAGS)
-LDFLAGS = -lerm -lclip -L$(PREFIX)/lib -Wl,-rpath=$(PREFIX)/lib $(CONF_LDFLAGS)
-SOURCE	= src/lex.o src/main.o src/parse.o src/symbol.o src/symtable.o src/token.o src/types.o
-CC	= $(CONF_CC)
-LD	= $(CONF_LD)
+PREFIX	= $(bmake_PREFIX)
+CFLAGS	= -O2 -Wall -Werror -I$(PREFIX)/include $(bmake_CFLAGS)
+#LDFLAGS = -lerm -lclip -L$(PREFIX)/lib -Wl,-rpath=$(PREFIX)/lib $(bmake_LDFLAGS)
+CC	= $(bmake_CC)
+LD	= $(bmake_LD)
 DEPDIRS = src/deps
 
-all: sci
-
-sci: $(SOURCE)
-	$(LD) $(LDFLAGS) $^ -o $@
+all: 
 
 sinclude src/deps/*
 
@@ -21,16 +17,16 @@ clean:
 	rm -f src/*.o
 
 maintainer-clean: clean
-	$(conf_clean)
+	$(bmake_clean)
 	rm -rf $(DEPDIRS)
 
 Makefile: Makefile.in configure
 	@echo "rebuilding makefile"
-	$(conf_reconfigure)
+	$(bmake_reconfigure)
 
 Makefile.in:
 
 configure: mktests/*
 	@touch configure
 
-.PHONY: all clean maintainer-clean
+.PHONY: all clean maintainer-clean dist
