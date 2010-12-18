@@ -1,9 +1,8 @@
 PREFIX	= $(bmake_PREFIX)
-CFLAGS	= -O2 -Wall -Werror -I$(PREFIX)/include $(bmake_CFLAGS)
-#LDFLAGS = -lerm -lclip -L$(PREFIX)/lib -Wl,-rpath=$(PREFIX)/lib $(bmake_LDFLAGS)
+CFLAGS	= $(bmake_CFLAGS) -g -O2 
+LDFLAGS = $(bmake_CLFLAGS)
 CC	= $(bmake_CC)
 LD	= $(bmake_LD)
-DEPDIRS = src/deps
 
 all: 
 
@@ -14,7 +13,6 @@ sinclude src/deps/*
 	$(CC) $(CFLAGS) -MD -MP -MF $(@D)/deps/$(@F).dep -c $< -o $@
 
 clean:
-	rm -f src/*.o
 
 maintainer-clean: clean
 	$(bmake_clean)
@@ -28,5 +26,7 @@ Makefile.in:
 
 configure: mktests/*
 	@touch configure
+
+dist:
 
 .PHONY: all clean maintainer-clean dist
