@@ -54,7 +54,7 @@ case "$cmd" in
 
 		;;
 	
-	help)
+	help | -? | --help)
 		usage
 		;;
 

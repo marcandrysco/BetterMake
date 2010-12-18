@@ -4,7 +4,7 @@
 makelist="Makefile"
 config="src/config.h"
 
-unset host
+unset host prefix
 
 for opt in "$@"
 do
@@ -23,6 +23,8 @@ do
 			test -z "$opt" && continue || build="$opt" ;;
 		--host)
 			test -z "$opt" && continue || host="$opt" ;;
+		--prefix)
+			test -z "$opt" && continue || prefix="$opt" ;;
 		*)
 			echo "invalid option $optname"
 			exit 1
@@ -34,7 +36,9 @@ done
 
 test ! -z $optname && echo "$optname requires parameter" && exit
 
-unset CONFDECL
+test -z "$prefix" && prefix="/usr/bin"
+
+unset BMAKE_DECL
 
 cat <<EOF > "$config"
 #ifndef CONFIG_H
@@ -63,15 +67,18 @@ do
 
 	cat <<EOF > "$make"
 #configure
-conf_clean = rm $makelist $config
-CONF_CFLAGS = 
-CONF_LDFLAGS = 
-conf_reconfigure = $reconf
-$CONFDECL
+bmake_clean = rm $makelist $config
+bmake_CFLAGS = 
+bmake_LDFLAGS = 
+bmake_reconfigure = $reconf
+bmake_PREFIX = $prefix
+$BMAKE_DECL
 #endconfigure
 EOF
 
 	cat "$make.in" >> "$make"
+
+	#cat <<EOF >
 done
 
 echo "#endif" >> "$config"
