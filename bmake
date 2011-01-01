@@ -38,6 +38,7 @@ getopt_long()
 	done
 	shift
 
+	echo "params='';"
 	local short="" ; local long=""
 
 	for arg in "$@"
@@ -123,8 +124,9 @@ getopt_long()
 			;;
 
 		*)
+			#echo "params=\"$params\"'"
+			#echo "$arg'"
 			;;
-
 		esac
 	done
 
@@ -155,6 +157,53 @@ findtarget()
 	echo ;
 }
 
+quote()
+{
+	local str="$*"
+
+	while [ 1 ]
+	do
+		local piece="${str%%\'*}"
+		test "$piece" = "$str" && break
+		printf "'%s'\\'" "$piece"
+		str="${str#*\'}"
+	done
+
+	printf "'%s'" "$str"
+}
+
+dblquote()
+{
+	local str="$*"
+
+	while [ 1 ]
+	do
+		local piece="${str%%[\\\"]*}"
+		test "$piece" = "$str" && break
+		local chr="${str#"$piece"}"
+		str="${str#*[\\\"]}"
+		printf %s%s "$piece" "\\${chr%"$str"}"
+	done
+
+	printf %s "$str"
+}
+
+undblquote()
+{
+	local str="$*"
+
+	while [ 1 ]
+	do
+		local piece="${str%%\\?*}"
+		test "$piece" = "$str" && break
+		local chr="${str#*\\}"
+		str="${chr#?}"
+		printf %s%s "$piece" "${chr%"$str"}"
+	done
+
+	printf %s "$str"
+}
+
 target()
 {
 	cmd=$1; shift;
@@ -162,11 +211,15 @@ target()
 	case "$cmd" in
 		add)
 			srcfile="sources"
-			getopt_long s: s,srcfile -- "$@"
 			eval `getopt_long s: s,srcfile -- "$@"`
 			if [ -n "$err" ] ; then echo "$err" ; exit 1 ; fi
 
-			echo "srcfile: $srcfile"
+			for arg in "$@"
+			do
+				test -z "${arg%%-*}" && continue
+
+				printf "Target\n\tOutput\t\"%s\"\nEndTarget\n" `dblquote "$arg"` >> "$srcfile"
+			done
 
 			;;
 
@@ -182,7 +235,7 @@ if [ "$#" -eq 0 ] ; then
 	exit
 fi
 
-cmd=$1; shift;
+cmd=$1 ; shift
 
 case "$cmd" in
 	install)

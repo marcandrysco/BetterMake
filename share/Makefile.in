@@ -6,7 +6,7 @@ LD	= $(bmake_LD)
 
 all: 
 
-sinclude Makefile.inc
+sinclude sources.mk
 sinclude src/deps/*
 
 %.o: %.c Makefile
@@ -19,11 +19,13 @@ maintainer-clean: clean
 	$(bmake_clean)
 	rm -rf $(DEPDIRS)
 
-Makefile: Makefile.in configure
+Makefile: Makefile.in configure sources
 	@echo "rebuilding makefile"
 	$(bmake_reconfigure)
 
 Makefile.in:
+
+sources:
 
 configure: mktests/*
 	@touch configure
