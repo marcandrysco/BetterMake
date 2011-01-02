@@ -1,5 +1,10 @@
 #!/bin/sh
 
+quote()
+{
+	echo "$1"
+}
+
 sharedir="`dirname $0`/share"
 
 usage()
@@ -65,7 +70,7 @@ getopt_long()
 			fi
 
 			if echo "$opt" | grep "$short:" >/dev/null 2>/dev/null ; then
-				echo "$arg" | grep "=" >/dev/null 2>/dev/null || continue
+				test -n "${arg%%*=*}" && continue
 				echo -n "$long='"`echo "${arg#*=}" | sed "s/'/'\\\\\\\\''/g"`"';"
 			else
 				if echo "$arg" | grep "=" >/dev/null 2>/dev/null && [ -n "warn" ]; then
@@ -150,9 +155,16 @@ copyfile()
 	test ! -z "$2" && chmod "$2" "$1"
 }
 
+quotify()
+{
+	echo "$1" | sed 's/"/\\"/g'
+}
+
 findtarget()
 {
-	echo ;
+	target="`quotify "$2"`"
+	grep -E "^[[:space:]]*Target[[:space:]]*\"$target\"[[:space:]]*$" "$1" >/dev/null 2>/dev/null
+	return $?
 }
 
 target()
@@ -161,12 +173,20 @@ target()
 
 	case "$cmd" in
 		add)
+			target=""
 			srcfile="sources"
-			getopt_long s: s,srcfile -- "$@"
-			eval `getopt_long s: s,srcfile -- "$@"`
+			eval `getopt_long s:t: s,srcfile t,target -- "$@"`
 			if [ -n "$err" ] ; then echo "$err" ; exit 1 ; fi
+			test -z "$target" && read -p"Target name: " target
 
-			echo "srcfile: $srcfile"
+			if findtarget "$srcfile" "$target" ; then
+				echo "Target '$target' already exists" >&2
+				exit 1
+			fi
+
+			target=`quotify "$target"`
+			echo "Target \"`quotify "$target"`\"" >> "$srcfile"
+			echo "EndTarget" >> "$srcfile"
 
 			;;
 
