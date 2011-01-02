@@ -1,5 +1,37 @@
 #!/bin/sh
 
+extract()
+{
+	cat "$1" | sed -n 's/^\s'"$2"'\s*"\(.*\)"\s*$/\1/p'
+}
+
+if [ -e sources ] ; then
+	tmp=`mktemp`
+
+	rm -f sources.mk
+	cp sources "$tmp"
+
+	while grep -E '^\s*Target\s*$' "$tmp" >/dev/null 2>/dev/null
+	do
+		cat "$tmp" | sed '/^\s*EndTarget\s*$/,$d' > "$tmp-1"
+
+		printf "%s :" `extract "$tmp-1" "Output"` >> sources.mk
+
+		for file in `extract "$tmp-1" "Source"`
+		do
+			printf " %s" "$file" >> sources.mk
+		done
+
+		printf "\n" >> sources.mk
+
+		cat "$tmp" | sed '1,/^\s*EndTarget\s*$/d' > "$tmp-2"
+		rm -f "$tmp-1"
+		mv "$tmp-2" "$tmp"
+	done
+
+	rm "$tmp"
+fi
+
 config="config.h"
 test -e "src" && config="src/$config"
 
