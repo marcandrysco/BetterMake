@@ -249,6 +249,12 @@ case "$cmd" in
 
 		copyfile "Makefile.in"
 		copyfile "configure" 0755
+		mkdir mktests
+		for file in "mktests/00-cc" "mktests/00-ld"
+		do
+			copyfile "$file" 0755
+		done
+
 		;;
 	
 	target)

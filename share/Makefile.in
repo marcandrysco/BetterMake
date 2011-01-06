@@ -4,20 +4,17 @@ LDFLAGS = $(bmake_CLFLAGS)
 CC	= $(bmake_CC)
 LD	= $(bmake_LD)
 
-all: 
+all: bmake_all
 
 sinclude sources.mk
 sinclude src/deps/*
 
-%.o: %.c Makefile
-	@if [ ! -d "$(@D)/deps" ] ; then mkdir "$(@D)/deps" ; fi
-	$(CC) $(CFLAGS) -MD -MP -MF $(@D)/deps/$(@F).dep -c $< -o $@
-
-clean:
+clean: bmake_clean
 
 maintainer-clean: clean
 	$(bmake_clean)
-	rm -rf $(DEPDIRS)
+	rm -f Makefile config.status sources.mk
+#rm -rf $(DEPDIRS)
 
 Makefile: Makefile.in configure sources
 	@echo "rebuilding makefile"
