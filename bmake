@@ -1,5 +1,10 @@
 #!/bin/sh
 
+quote()
+{
+	echo "$1"
+}
+
 sharedir="`dirname $0`/share"
 
 usage()
@@ -66,7 +71,7 @@ getopt_long()
 			fi
 
 			if echo "$opt" | grep "$short:" >/dev/null 2>/dev/null ; then
-				echo "$arg" | grep "=" >/dev/null 2>/dev/null || continue
+				test -n "${arg%%*=*}" && continue
 				echo -n "$long='"`echo "${arg#*=}" | sed "s/'/'\\\\\\\\''/g"`"';"
 			else
 				if echo "$arg" | grep "=" >/dev/null 2>/dev/null && [ -n "warn" ]; then
@@ -152,9 +157,16 @@ copyfile()
 	test ! -z "$2" && chmod "$2" "$1"
 }
 
+quotify()
+{
+	echo "$1" | sed 's/"/\\"/g'
+}
+
 findtarget()
 {
-	echo ;
+	target="`quotify "$2"`"
+	grep -E "^[[:space:]]*Target[[:space:]]*\"$target\"[[:space:]]*$" "$1" >/dev/null 2>/dev/null
+	return $?
 }
 
 quote()
@@ -210,9 +222,16 @@ target()
 
 	case "$cmd" in
 		add)
+			target=""
 			srcfile="sources"
 			eval `getopt_long s: s,srcfile -- "$@"`
 			if [ -n "$err" ] ; then echo "$err" ; exit 1 ; fi
+			test -z "$target" && read -p"Target name: " target
+
+			if findtarget "$srcfile" "$target" ; then
+				echo "Target '$target' already exists" >&2
+				exit 1
+			fi
 
 			for arg in "$@"
 			do
