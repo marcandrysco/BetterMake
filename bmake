@@ -1,11 +1,15 @@
 #!/bin/sh
 
-quote()
-{
-	echo "$1"
-}
-
 sharedir="`dirname $0`/share"
+
+##
+# usage Function
+#   Displays the usage information regarding the list of possible commands.
+# Parameters
+#   int fd = 1
+#     Optional. The file descriptor number to send it to, often set to '2' for
+#     error out.
+#.
 
 usage()
 {
@@ -30,6 +34,33 @@ Possible commands are:
   help
 EOF
 }
+
+##
+# getopt_long Function
+#   Parses a list of options, retrieving all of the values and flags. The
+#   returned data is valid POSIX shell code that should be evaluated in order
+#   to obtain the desired parameters. For each long parameter, a variable is
+#   created with that parameter's name. For all short parameters without a
+#   long equivalent, then a variable with that single character is created.
+#   All non-option parameters are skipped (anything that does not begin with a
+#   dash).
+# Parameters
+#   string shortopts
+#     A list of short options that are accepted. Options followed by a colon
+#     denote that those options require values, otherwise the option is a flag
+#     of '1' or '0'.
+#   string longopt ...
+#     A set of long options in the form 'o,optname' where 'o' is the short
+#     option equivalent and 'optname' is the full long name.
+#   -- args ...
+#     After the string '--', all of the parameters are placed after it.
+#     Generally the value '"$@"' should be passed.
+# Return Value
+#   The returned text should be dirctly evaluated using the 'eval' build-in
+#   function. All the parameters will be stored in their respective variables.
+#   If an error occurs during processing, then the value 'err' will be set to
+#   a text error message.
+#.
 
 getopt_long()
 {
@@ -129,8 +160,6 @@ getopt_long()
 			;;
 
 		*)
-			#echo "params=\"$params\"'"
-			#echo "$arg'"
 			;;
 		esac
 	done

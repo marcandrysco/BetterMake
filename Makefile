@@ -9,10 +9,11 @@ all:
 	@echo Nothing needs to be built
 
 install:
+	for file in share/mktests/* ; do install --mode=0755 -D "$$file" $(SHARE)/bmake/mktests/"$${file##*/}" ; done
 	install --mode=0644 -D share/Makefile.in $(SHARE)/bmake/Makefile.in
 	install --mode=0755 -D share/configure $(SHARE)/bmake/configure
 	install --mode=0755 -D bmake $(BIN)/bmake
-	sed -i '/^sharedir=/ csharedir='\'"$(SHARE)"\' $(BIN)/bmake
+	sed -i '/^sharedir=/ csharedir='\'"$(SHARE)/bmake"\' $(BIN)/bmake
 
 dist:
 	if [ -e $(DISTNAME) ] ; then rm -rf $(DISTNAME) ; fi
