@@ -6,8 +6,7 @@ LD	= $(bmake_LD)
 
 all: bmake_all
 
-sinclude sources.mk
-sinclude src/deps/*
+install: bmake_install
 
 clean: bmake_clean
 
@@ -15,6 +14,9 @@ maintainer-clean: clean
 	$(bmake_clean)
 	rm -f Makefile config.status sources.mk
 #rm -rf $(DEPDIRS)
+
+sinclude sources.mk
+sinclude src/deps/*
 
 Makefile: Makefile.in configure sources
 	@echo "rebuilding makefile"
