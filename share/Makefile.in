@@ -6,6 +6,14 @@ LD	= $(bmake_LD)
 
 all: bmake_all
 
+check: test
+
+test: bmake_test
+
+bmake_all:
+
+bmake_test:
+
 install: bmake_install
 
 clean: bmake_clean
@@ -31,4 +39,4 @@ configure: mktests/*
 
 dist:
 
-.PHONY: all clean maintainer-clean dist
+.PHONY: all clean maintainer-clean check test dist

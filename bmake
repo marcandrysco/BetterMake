@@ -304,6 +304,9 @@ case "$cmd" in
 		done
 
 		;;
+
+	update)
+		;;
 	
 	target)
 		target "$@"
