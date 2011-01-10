@@ -23,6 +23,7 @@ maintainer-clean: clean
 	rm -f Makefile config.status sources.mk
 #rm -rf $(DEPDIRS)
 
+sinclude user.mk
 sinclude sources.mk
 sinclude src/deps/*
 
