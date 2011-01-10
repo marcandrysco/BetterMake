@@ -2,7 +2,7 @@ PREFIX	= $(HOME)
 SHARE	= $(PREFIX)/share
 BIN	= $(PREFIX)/bin
 APPNAME = bmake
-VERSION = 0.1
+VERSION = 0.1.1
 DISTNAME= $(APPNAME)-$(VERSION)
 
 all:
