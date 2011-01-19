@@ -33,10 +33,19 @@ process_sources()
 
 	rm -f "$2"
 
+	clean=""	# Cleaning commands
+	objlist=""	# List of all object files
+	depdirlist=""	# List of dependency directories
+
 	while [ 1 ]
 	do
 		local copy="`printf %s "$remaining" | sed '/^\s*EndTarget\s*$/,$d'`"
 		test "$copy" = "$remaining" && break
+
+		cdeps="";				# C Dependencies
+		targetdeps=""				# Target Dependencies
+		cflags=" `extract "$copy" CFlags`"	# C Flags
+		ldflags=" `extract "$copy" LDFlags`"	# Linker Flags
 
 		local target="`extract "$copy" Name`"
 		local type="`extract "$copy" Type`"
@@ -46,21 +55,20 @@ process_sources()
 		local obj="`printf %s "$sources" | sed 's/.c\(pp\)\?$/.o/'`"
 		obj="`echo -n $obj`"
 
-		local cflags=" `extract "$copy" CFlags`"
-		local ldflags=" `extract "$copy" LDFlags`"
-
 		test -z "$version" && version="0.0.0"
 		local shortversion="${version%%.*}"
 
 		case "$local" in
 			[Tt][Rr][Uu][Ee] | [Yy][Ee][Ss] )
-				local prefix="$HOME"
+				prefix="$HOME"
+				bindir="$HOME/bin"
+				libdir="$HOME/bin"
+				sharedir="$HOME/bin"
 				cflags="$cflags -I\"$HOME/include\""
 				ldflags="$ldflags -L\"$HOME/lib\" -Wl,-rpath=\"$HOME/lib\""
 				;;
 
 			[Ff][Aa][Ll][Ss][Ee] | [Nn][Oo] | "")
-				local prefix="/usr"
 				;;
 
 			*)
@@ -68,16 +76,25 @@ process_sources()
 				exit 1
 		esac
 
-		local bindir="$prefix/bin"
-		local libdir="$prefix/lib"
+		# Precompiled header handling
+		pch="`extract "$copy" PCH`"
+		if [ -n "$pch" ] ; then
+			printf '%s.gch: %s%s\n' "$pch" "$pch" "$cdeps" >> "$2"
+			printf '\t$(bmake_PRECC)\n' >> "$2"
+			printf '\t$(CC) $(CFLAGS)%s -c $< -o $@\n\n' "$cflags" >> "$2"
+
+			clean="$clean`printf '\n\trm -f %s.gch\n' "$pch"`"
+			cdeps="$cdeps $pch.gch"
+		fi
 
 		case "$type" in
 			"Application" | "" )
 				printf 'bmake_all: %s\n\n' "$target" >> "$2"
-				printf '%s: %s\n\t%s\n\n' "$target" "$obj" "`printf '$(LD)%s $^ -o $@ $(LDFLAGS)\n' "$ldflags"`" >> "$2"
+				printf '%s: %s%s\n' "$target" "$obj" "$targetdeps" >> "$2"
+				printf '\t%s\n\n' "`printf '$(LD)%s $^ -o $@ $(LDFLAGS)\n' "$ldflags"`" >> "$2"
 				printf 'bmake_install: %s_install\n\n' "$target" >> "$2"
 				printf '%s_install:\n\tinstall --mode 0755 -D %s "%s/%s"\n\n' "$target" "$target" "$bindir" "$target" >> "$2"
-				local clean="`printf '\trm -f %s' "$target"`"
+				clean="$clean`printf '\n\trm -f %s\n' "$target"`"
 				local ldextra=''
 				;;
 
@@ -88,7 +105,7 @@ process_sources()
 				printf '\t@./%s || echo "**** %s failed ****"\n\n' "$target" "$target" >> "$2"
 				printf '%s: %s %s| all\n' "$target" "$obj" "$deps">> "$2"
 				printf '\t%s\n\n' "`printf '$(LD)%s %s -o $@ $(LDFLAGS)\n' "$ldflags" "$obj"`" >> "$2"
-				local clean="`printf '\trm -f %s' "$target"`"
+				clean="$clean`printf '\n\trm -f %s\n' "$target"`"
 				local ldextra=''
 				;;
 
@@ -105,7 +122,7 @@ process_sources()
 				printf '\tinstall --mode 0755 -D lib%s.so.%s "%s/lib%s.so.%s"\n' "$target" "$version" "$libdir" "$target" "$version" >> "$2"
 				printf '\tln -fs lib%s.so.%s "%s/lib%s.so"\n' "$target" "$version" "$libdir" "$target" >> "$2"
 				printf '\tln -fs lib%s.so.%s "%s/lib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$target" "$shortversion" >> "$2"
-				local clean="`printf '\trm -f lib%s.a lib%s.so.%s lib%s.so.%s lib%s.so' "$target" "$target" "$version" "$target" "$shortversion" "$target"`"
+				clean="$clean`printf '\n\trm -f lib%s.a lib%s.so.%s lib%s.so.%s lib%s.so' "$target" "$target" "$version" "$target" "$shortversion" "$target"`"
 				local ldextra=' -fpic'
 				;;
 
@@ -115,22 +132,37 @@ process_sources()
 
 		for file in $sources
 		do
-			printf '%s: %s\n\t$(bmake_PRECC)\n\t$(CC)%s -c $< -o $@ $(CFLAGS)%s\n\n' "`printf %s "$file" | sed 's/.c\(pp\)\?$/.o/'`" "$file" "$cflags" "$ldextra" >> "$2"
+			objfile="`printf %s "$file" | sed 's/.c\(pp\)\?$/.o/'`"
+			objlist="$objlist $objfile"
+
+			printf '%s: %s%s\n' "$objfile" "$file" "$cdeps" >> "$2"
+			printf '\t$(bmake_PRECC)\n' >> "$2"
+			printf '\t$(CC)%s -c $< -o $@ $(CFLAGS)%s\n\n' "$cflags" "$ldextra" >> "$2"
+
+			# Add depdir if not in list
+			depdir="${file%/*}/deps"
+			test "${depdirlist%" $depdir"}" = "$depdirlist" && depdirlist="$depdirlist $depdir"
 		done
 
-		printf 'bmake_clean: %s_clean\n\n' "$target" >> "$2"
-		printf '%s_clean:\n%s\n\trm -f %s\n\n.PHONY: %s_clean\n\n' "$target" "$clean" "$obj" "$target" >> "$2"
+		#printf '%s_clean:\n%s\n\trm -f %s\n\n.PHONY: %s_clean\n\n' "$target" "$clean" "$obj" "$target" >> "$2"
 
 		remaining=`printf %s "$remaining" | sed '1,/^\s*EndTarget\s*$/d'`
 	done
-}
 
-process_sources sources sources.mk
+	test "$objlist" && clean="$clean`printf '\n\trm -f%s' "${objlist% }"`"
+	test "$depdirlist" && clean="$clean`printf '\n\trm -rf%s' "${depdirlist% }"`"
+
+	printf 'bmake_clean:%s\n\n' "$clean" >> "$2"
+	printf '.PNOHY: bmake_clean\n' >> "$2"
+}
 
 config="config.h"
 test -e "src" && config="src/$config"
 
-unset host prefix
+prefix="/usr/local"
+bindir=""
+libdir=""
+sharedir=""
 
 for opt in "$@"
 do
@@ -147,10 +179,13 @@ do
 	case "$optname" in
 		--build)
 			test -z "$opt" && continue ; build="$opt" ;;
+
 		--host)
 			test -z "$opt" && continue ; host="$opt" ;;
-		--prefix)
-			test -z "$opt" && continue ; prefix="$opt" ;;
+
+		--prefix | --libdir | --bindir )
+			test -z "$opt" && continue ; eval "${optname%--}\"\$opt\"" ;;
+
 		*)
 			echo "invalid option $optname"
 			exit 1
@@ -160,16 +195,33 @@ do
 	unset optname
 done
 
+test -z "$bindir" && bindir="$prefix/bin"
+test -z "$libdir" && libdir="$prefix/lib"
+test -z "$sharedir" && sharedir="$prefix/share"
+
 test ! -z $optname && echo "'$optname' requires parameter" && exit 1
 
 test -z "$prefix" && prefix="/usr/bin"
 
+process_sources sources sources.mk
+
 unset BMAKE_DECL
 
-cat <<EOF > "$config"
+build_config_h()
+{
+	cat <<EOF > "$config"
 #ifndef CONFIG_H
 #define CONFIG_H
+
+#define BMAKE__PATH_PREFIX	"$prefix"
+#define BMAKE__PATH_BIN		"$bindir"
+#define BMAKE__PATH_LIB		"$libdir"
+#define BMAKE__PATH_SHARE	"$sharedir"
+
 EOF
+}
+
+build_config_h
 
 for script in mktests/[0-9][0-9]*
 do

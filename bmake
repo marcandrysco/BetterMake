@@ -297,7 +297,7 @@ case "$cmd" in
 
 		copyfile "Makefile.in"
 		copyfile "configure" 0755
-		mkdir mktests
+		test ! -d mktests && mkdir mktests
 		for file in "mktests/00-cc" "mktests/00-ld"
 		do
 			copyfile "$file" 0755
@@ -306,6 +306,14 @@ case "$cmd" in
 		;;
 
 	update)
+		copyfile "Makefile.in"
+		copyfile "configure" 0755
+		test ! -d mktests && mkdir mktests
+		for file in "mktests/00-cc" "mktests/00-ld"
+		do
+			copyfile "$file" 0755
+		done
+
 		;;
 	
 	target)
