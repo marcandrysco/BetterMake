@@ -1,6 +1,6 @@
 PREFIX	= $(bmake_PREFIX)
 CFLAGS	= $(bmake_CFLAGS) -g -O2 
-LDFLAGS = $(bmake_CLFLAGS)
+LDFLAGS = $(bmake_LDFLAGS)
 CC	= $(bmake_CC)
 LD	= $(bmake_LD)
 
@@ -24,7 +24,6 @@ maintainer-clean: clean
 
 sinclude user.mk
 sinclude sources.mk
-sinclude src/.deps/*
 
 Makefile: Makefile.in configure $(wildcard mktests/*) $(wildcard config.args) $(wildcard sources)
 	@echo "rebuilding makefile"
