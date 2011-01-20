@@ -17,6 +17,34 @@ extract()
 }
 
 ##
+# quote Function
+#   Given the input string, it places it within single quotes, making sure that
+#   any single quotes within the string are properly escaped.
+# Version
+#   1.0
+# Parameters
+#   string input
+#     The input text.
+# Printed
+#   Prints out the quoted string.
+#.
+
+quote()
+{
+	local str="$*"
+
+	while [ 1 ]
+	do
+		local piece="${str%%\'*}"
+		test "$piece" = "$str" && break
+		printf "'%s'\\'" "$piece"
+		str="${str#*\'}"
+	done
+
+	printf "'%s'" "$str"
+}
+
+##
 # process_sources Function
 #   Inputs the sources configuration file and produces the corresponding
 #   makefile.
@@ -36,6 +64,9 @@ process_sources()
 	clean=""	# Cleaning commands
 	objlist=""	# List of all object files
 	depdirlist=""	# List of dependency directories
+	installdeps=""	# Dependencies for installation
+	install=""	# Commands for installation
+	clean=""	# Rules for cleaning
 
 	while [ 1 ]
 	do
@@ -46,6 +77,10 @@ process_sources()
 		targetdeps=""				# Target Dependencies
 		cflags=" `extract "$copy" CFlags`"	# C Flags
 		ldflags=" `extract "$copy" LDFlags`"	# Linker Flags
+
+		# Add on global flags
+		test "$CFLAGS" && cflags=" $CFLAGS$cflags"
+		test "$LDFLAGS" && ldflags=" $LDFLAGS$ldflags"
 
 		local target="`extract "$copy" Name`"
 		local type="`extract "$copy" Type`"
@@ -88,42 +123,56 @@ process_sources()
 		fi
 
 		case "$type" in
+			# Build an executable application
 			"Application" | "" )
 				printf 'bmake_all: %s\n\n' "$target" >> "$2"
 				printf '%s: %s%s\n' "$target" "$obj" "$targetdeps" >> "$2"
-				printf '\t%s\n\n' "`printf '$(LD)%s $^ -o $@ $(LDFLAGS)\n' "$ldflags"`" >> "$2"
-				printf 'bmake_install: %s_install\n\n' "$target" >> "$2"
-				printf '%s_install:\n\tinstall --mode 0755 -D %s "%s/%s"\n\n' "$target" "$target" "$bindir" "$target" >> "$2"
+				printf '\t%s\n\n' "`printf '$(LD) $^ -o $@ $(LDFLAGS)%s\n' "$ldflags"`" >> "$2"
+				installdeps="$installdeps $target"
+				install="$install`printf '\n\tinstall --mode 0755 -D %s "%s/%s"\n' "$target" "$bindir" "$target"`"
 				clean="$clean`printf '\n\trm -f %s\n' "$target"`"
 				local ldextra=''
 				;;
 
+			# Build a test application meant to be run during a make check
 			"TestApplication")
-				local deps="`extract "$copy" Deps`"
 				printf 'bmake_test: %s_test\n\n' "$target" >> "$2"
 				printf '%s_test: %s\n' "$target" "$target" >> "$2"
 				printf '\t@./%s || echo "**** %s failed ****"\n\n' "$target" "$target" >> "$2"
 				printf '%s: %s %s| all\n' "$target" "$obj" "$deps">> "$2"
-				printf '\t%s\n\n' "`printf '$(LD)%s %s -o $@ $(LDFLAGS)\n' "$ldflags" "$obj"`" >> "$2"
+				printf '\t%s\n\n' "`printf '$(LD) %s -o $@ $(LDFLAGS)%s\n' "$obj" "$ldflags"`" >> "$2"
 				clean="$clean`printf '\n\trm -f %s\n' "$target"`"
 				local ldextra=''
 				;;
 
+			# Build a static and (optionally) a shared library
 			"Library")
-				printf 'bmake_all: lib%s.a lib%s.so.%s\n\n' "$target" "$target" "$version" >> "$2"
-				printf 'lib%s.a: %s\n\t%s\n\n' "$target" "$obj" "`printf 'ar rcs $@ $^'`" >> "$2"
-				printf 'lib%s.so.%s: %s\n' "$target" "$version" "$obj" >> "$2"
-				printf '\t$(CC)%s -fpic -shared -Wl,-soname,lib%s.so.%s -o $@ $^\n' "$ldflags" "$target" "$shortversion" >> "$2"
-				printf '\tln -fs lib%s.so.%s lib%s.so.%s\n' "$target" "$version" "$target" "$shortversion" >> "$2"
-				printf '\tln -fs lib%s.so.%s lib%s.so\n\n' "$target" "$version" "$target" >> "$2"
-				printf 'bmake_install: lib%s_install\n\n' "$target" >> "$2"
-				printf 'lib%s_install: lib%s.a lib%s.so.%s\n' "$target" "$target" "$target" "$version" >> "$2"
-				printf '\tinstall --mode 0644 -D lib%s.a "%s/lib%s.a"\n' "$target" "$libdir" "$target" >> "$2"
-				printf '\tinstall --mode 0755 -D lib%s.so.%s "%s/lib%s.so.%s"\n' "$target" "$version" "$libdir" "$target" "$version" >> "$2"
-				printf '\tln -fs lib%s.so.%s "%s/lib%s.so"\n' "$target" "$version" "$libdir" "$target" >> "$2"
-				printf '\tln -fs lib%s.so.%s "%s/lib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$target" "$shortversion" >> "$2"
-				clean="$clean`printf '\n\trm -f lib%s.a lib%s.so.%s lib%s.so.%s lib%s.so' "$target" "$target" "$version" "$target" "$shortversion" "$target"`"
-				local ldextra=' -fpic'
+				printf 'bmake_all: lib%s.a\n\n' "$target" >> "$2"
+				printf 'lib%s.a: %s\n\t%s\n\n' "$target" "$obj" "`printf '%sar rcs $@ $^' "$toolchain"`" >> "$2"
+				installdeps="$installdeps lib$target.a"
+				install="$install`printf '\n\tinstall --mode 0644 -D lib%s.a "%s/lib%s.a"' "$target" "$libdir" "$target"`"
+				clean="$clean`printf '\n\trm -f lib%s.a' "$target"`"
+				if [ "$dynlib" = "so" ] ; then
+					printf 'bmake_all: lib%s.so.%s\n\n' "$target" "$version" >> "$2"
+					printf 'lib%s.so.%s: %s\n' "$target" "$version" "$obj" >> "$2"
+					printf '\t$(CC) -shared -Wl,-soname,lib%s.so.%s -o $@ $^%s\n' "$target" "$shortversion" "$ldflags" >> "$2"
+					printf '\tln -fs lib%s.so.%s lib%s.so.%s\n' "$target" "$version" "$target" "$shortversion" >> "$2"
+					printf '\tln -fs lib%s.so.%s lib%s.so\n\n' "$target" "$version" "$target" >> "$2"
+					cflags="$cflags -fpic"
+					installdeps="$installdeps `printf 'lib%s.so.%s' "$target" "$version"`"
+					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.so.%s "%s/lib%s.so.%s"' "$target" "$version" "$libdir" "$target" "$version"`"
+					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so"' "$target" "$version" "$libdir" "$target"`"
+					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$target" "$shortversion"`"
+					clean="$clean`printf '\n\trm -rf lib%s.so.%s lib%s.so.%s lib%s.so' "$target" "$version" "$target" "$shortversion" "$target"`"
+				elif [ "$dynlib" = "dll" ] ; then
+					printf 'bmake_all: lib%s.dll\n\n' "$target" >> "$2"
+					printf 'lib%s.dll: %s\n' "$target" "$obj" >> "$2"
+					printf '\t$(CC) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s\n' "$target" "$ldflags" >> "$2"
+					installdeps="$installdeps `printf 'lib%s.dll' "$target"`"
+					install="$install`printf '\n\tinstall --mode 0644 -D lib%s.dll.a "%s/lib%s.dll.a"\n' "$target" "$libdir" "$target"`"
+					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.dll "%s/lib%s.dll"' "$target" "$bindir" "$target"`"
+					clean="$clean`printf '\n\trm -rf lib%s.dll lib%s.dll.a' "$target" "$target"`"
+				fi
 				;;
 
 			*)
@@ -137,14 +186,12 @@ process_sources()
 
 			printf '%s: %s%s\n' "$objfile" "$file" "$cdeps" >> "$2"
 			printf '\t$(bmake_PRECC)\n' >> "$2"
-			printf '\t$(CC)%s -c $< -o $@ $(CFLAGS)%s\n\n' "$cflags" "$ldextra" >> "$2"
+			printf '\t$(CC)%s -c $< -o $@ $(CFLAGS)\n\n' "$cflags" >> "$2"
 
 			# Add depdir if not in list
 			depdir="${file%/*}/deps"
 			test "${depdirlist%" $depdir"}" = "$depdirlist" && depdirlist="$depdirlist $depdir"
 		done
-
-		#printf '%s_clean:\n%s\n\trm -f %s\n\n.PHONY: %s_clean\n\n' "$target" "$clean" "$obj" "$target" >> "$2"
 
 		remaining=`printf %s "$remaining" | sed '1,/^\s*EndTarget\s*$/d'`
 	done
@@ -152,17 +199,28 @@ process_sources()
 	test "$objlist" && clean="$clean`printf '\n\trm -f%s' "${objlist% }"`"
 	test "$depdirlist" && clean="$clean`printf '\n\trm -rf%s' "${depdirlist% }"`"
 
+	printf 'bmake_install:%s%s\n\n' "$installdeps" "$install" >> "$2"
 	printf 'bmake_clean:%s\n\n' "$clean" >> "$2"
-	printf '.PNOHY: bmake_clean\n' >> "$2"
+	printf '.PNOHY: bmake_install bmake_clean\n' >> "$2"
 }
 
-config="config.h"
+config="config.h"	# Configuration header
+configlog="config.log"	# COnfigure script log
+
+rm -f "$configlog"
+
 test -e "src" && config="src/$config"
 
-prefix="/usr/local"
-bindir=""
-libdir=""
-sharedir=""
+CFLAGS=""		# C compiler flags
+LDFLAGS=""		# Linker flags
+toolchain=""		# Toolchain used for compilation
+prefix="/usr/local"	# Installation prefix
+bindir=""		# Binary installation directory
+libdir=""		# Library installation directory
+sharedir=""		# Share installation directory
+
+# Append arguments in config.args
+test -f config.args && eval set -- "`cat config.args`"
 
 for opt in "$@"
 do
@@ -183,8 +241,11 @@ do
 		--host)
 			test -z "$opt" && continue ; host="$opt" ;;
 
-		--prefix | --libdir | --bindir )
-			test -z "$opt" && continue ; eval "${optname%--}\"\$opt\"" ;;
+		--prefix | --libdir | --bindir | --toolchain)
+			test -z "$opt" && continue ; eval "${optname#--}=`quote "$opt"`" ;;
+
+		CFLAGS | LDFLAGS )
+			test -z "$opt" && continue ; eval "$optname=`quote "$opt"`" ;;
 
 		*)
 			echo "invalid option $optname"
@@ -198,12 +259,11 @@ done
 test -z "$bindir" && bindir="$prefix/bin"
 test -z "$libdir" && libdir="$prefix/lib"
 test -z "$sharedir" && sharedir="$prefix/share"
+test "$toolchain" && toolchain="$toolchain-"
 
 test ! -z $optname && echo "'$optname' requires parameter" && exit 1
 
 test -z "$prefix" && prefix="/usr/bin"
-
-process_sources sources sources.mk
 
 unset BMAKE_DECL
 
@@ -233,9 +293,16 @@ rm -f mktests/tmp*
 
 echo "#endif" >> "$config"
 
-reconf="$0"
-for param in "$@" ; do reconf="$reconf '$param'" ; done
-echo "$reconf" > config.status
+process_sources sources sources.mk
+
+# Build config.status file for reconfiguration
+rm -rf config.status
+echo -n "$0" > config.status
+for param in "$@"
+do
+	echo -n " `quote "$param"`" >> config.status
+done
+echo >> config.status
 chmod +x config.status
 
 if [ -e "$make" ] ; then

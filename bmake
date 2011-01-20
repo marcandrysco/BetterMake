@@ -198,6 +198,19 @@ findtarget()
 	return $?
 }
 
+##
+# quote Function
+#   Given the input string, it places it within single quotes, making sure that
+#   any single quotes within the string are properly escaped.
+# Version
+#   1.0
+# Parameters
+#   string input
+#     The input text.
+# Printed
+#   Prints out the quoted string.
+#.
+
 quote()
 {
 	local str="$*"
@@ -245,7 +258,7 @@ undblquote()
 	printf %s "$str"
 }
 
-target()
+targetcmd()
 {
 	cmd=$1; shift;
 
@@ -275,6 +288,37 @@ target()
 			usage 2
 			exit 1
 			;;
+	esac
+}
+
+testcmd()
+{
+	cmd=$1; shift;
+
+	case "$cmd" in
+	add)
+		test -z "$1" && echo "no tests to install" >&2 && exit 1
+
+		for name in "$@"
+		do
+			test ! -d mktests && echo "bmake build system not detected, aborting" >&2 && exit 1
+
+			match=""
+			for file in "$sharedir"/mktests/*
+			do
+				if [ "${file##*/[0-9][0-9]-}" = "$name" ] ; then
+					match="$file" ; break
+				fi
+			done
+
+			test -z "$match" && echo "No test '$name', aborting" >&2 && exit 1
+
+			cp "$file" mktests
+			echo "installed test '$name'"
+		done
+		;;
+	*)
+		usage 2 ; exit 1 ;;
 	esac
 }
 
@@ -316,9 +360,8 @@ case "$cmd" in
 
 		;;
 	
-	target)
-		target "$@"
-		;;
+	target | test )
+		"${cmd}cmd" "$@" ;;
 	
 	help | -? | --help)
 		usage

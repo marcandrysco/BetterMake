@@ -1,23 +1,19 @@
 #!/bin/sh
 
-testexec()
-{
-	$cc mktests/tmp.c -o mktests/tmp.out > config.log 2> config.log
-	return $?
-}
-
 echo -n "checking for restrict... "
 echo "int main() { void *restrict ptr = (void *)0; return 0; }" > mktests/tmp.c
 test -f mktests/tmp.c || echo error || return 1
 
-testexec && echo yes && return 0
+$cc mktests/tmp.c -o mktests/tmp.out >> config.log 2>&1
+test $? -eq 0 && echo yes && return 0
 echo no
 
 echo -n "checking for __restrict... "
 echo "int main() { void *__restrict ptr = (void *)0; return 0; }" > mktests/tmp.c
 test -f mktests/tmp.c || echo error || return 1
 
-testexec && (echo "#define restrict __restrict" >> "$config" ; echo yes ) && return 0
+$cc mktests/tmp.c -o mktests/tmp.out >> config.log 2>&1
+test $? -eq 0 && (echo "#define restrict __restrict" >> "$config" ; echo yes ) && return 0
 
 echo no
 return 1

@@ -1,0 +1,20 @@
+#!/bin/sh
+
+echo -n "dynamic library support... "
+
+if [ "$toolchain" ] && [ -z "${toolchain%%*mingw*}" ] ; then
+	echo dll ; dynlib=dll
+else
+	echo so ; dynlib=so
+
+	echo -n "checking if -fpic is supported... "
+	echo "int testfunc() { return 0; }" > mktests/tmp.c
+	if [ ! -f mktests/tmp.c ] ; then echo error ; return 1 ; fi
+
+	$cc mktests/tmp.c -Wall -Werror -shared -fpic -o mktests/tmp.out >> config.log 2>&1
+	if [ $? -eq 0 ] && [ -f mktests/tmp.out ] ; then
+		echo yes ; pic=yes
+	else
+		echo no ; pic=no
+	fi
+fi

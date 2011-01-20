@@ -1,14 +1,14 @@
 #!/bin/sh
 
-echo -n "checking for linker (gcc)... "
-if which gcc >/dev/null ; then
-	echo yes ; ld="gcc"
+echo -n "checking for linker (${toolchain}gcc)... "
+if which "${toolchain}gcc" >/dev/null ; then
+	echo yes ; ld="${toolchain}gcc"
 else
 	echo no
 
-	echo -n "checking for linker (ld)... "
-	if which gcc >/dev/null ; then
-		echo yes ; ld="ld"
+	echo -n "checking for linker (${toolchain}ld)... "
+	if which "${toolchain}gcc" >/dev/null ; then
+		echo yes ; ld="${toolchain}ld"
 	else
 		echo "error: no linker found"
 		exit 1
