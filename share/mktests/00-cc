@@ -1,7 +1,20 @@
 #!/bin/sh
 
+##
+# C Compiler Test
+#   Verifies that the current machine and toolchain have a C Compiler
+#   installed and checks for dependency tracking.
+# Variables
+#   cc
+#     Set to the available C Compiler.
+#   precc
+#     Adds dependency tracking to pre compilation.
+#   CFLAGS
+#     Adds flags for dependency tracking.
+#.
+
 echo -n "checking for compiler (${toolchain}gcc)... "
-if which "${toolchainL}gcc" >/dev/null ; then
+if which "${toolchain}gcc" >/dev/null ; then
 	echo yes ; cc="${toolchain}gcc"
 else
 	echo no
@@ -15,8 +28,5 @@ else
 	fi
 fi
 
-BMAKE_DECL="${BMAKE_DECL}\
-bmake_CC = $cc
-bmake_PRECC += @if [ ! -d \"\$(@D)/deps\" ] ; then mkdir \"\$(@D)/deps\" ; fi
-bmake_CFLAGS += -MD -MP -MF \$(@D)/deps/\$(@F).dep
-"
+precc="$precc if [ ! -d \"\$(@D)/$depdir\" ] ; then mkdir \"\$(@D)/$depdir\" ; fi ; "
+CFLAGS="$CFLAGS -MD -MP -MF \$(@D)/$depdir/\$(@F).dep"

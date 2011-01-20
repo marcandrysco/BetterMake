@@ -1,5 +1,19 @@
 #!/bin/sh
 
+##
+# Linker Test
+#   Tests to determine if shared libraries are supported, and determines if
+#   additional parameters are necessary to build libraries.
+# Variables
+#   dynlib
+#     Set to the default extension for the shared library type. Typicall is
+#     either 'so' or 'dll'. This will be unset if shared libraries are not
+#     supported.
+#   fpic
+#     Set to '-fPIC' or '-fpic' if position independent code is necessary for
+#     building shared libraries.
+#.
+
 echo -n "dynamic library support... "
 
 if [ "$toolchain" ] && [ -z "${toolchain%%*mingw*}" ] ; then

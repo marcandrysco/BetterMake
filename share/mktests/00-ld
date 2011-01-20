@@ -1,5 +1,13 @@
 #!/bin/sh
 
+##
+# Linker Test
+#   Verifies that the current machine and toolchain have a linker installed.
+# Variables
+#   ld
+#     Set to the available linker.
+#.
+
 echo -n "checking for linker (${toolchain}gcc)... "
 if which "${toolchain}gcc" >/dev/null ; then
 	echo yes ; ld="${toolchain}gcc"
@@ -14,7 +22,3 @@ else
 		exit 1
 	fi
 fi
-
-BMAKE_DECL="${BMAKE_DECL}\
-bmake_LD = $ld
-"
