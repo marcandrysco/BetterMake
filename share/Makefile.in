@@ -34,8 +34,10 @@ Makefile.in:
 
 sources:
 
-configure: config.args mktests/*
+configure: $(wildcard mktests/*) $(wildcard config.args)
 	@touch configure
+
+config.args:
 
 dist:
 

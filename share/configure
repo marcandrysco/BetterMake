@@ -220,7 +220,7 @@ libdir=""		# Library installation directory
 sharedir=""		# Share installation directory
 
 # Append arguments in config.args
-test -f config.args && eval set -- "`cat config.args`"
+test -f config.args && eval set -- "`cat config.args | sed 's/\s/ /g'`"
 
 for opt in "$@"
 do
