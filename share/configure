@@ -13,7 +13,7 @@
 
 extract()
 {
-	printf %s "$1" | sed -n 's/^\s'"$2"'\s*"\(.*\)"\s*$/\1/p'
+	printf %s "$1" | sed -n 's/^\s*'"$2"'\s*"\(.*\)"\s*$/\1/p'
 }
 
 ##
@@ -45,6 +45,67 @@ quote()
 }
 
 ##
+# ifeval Function
+#   Processes an input, looking for all of conditional statement of 'If',
+#   'ElseIf', 'Else', and 'EndIf'. All of the expressions are evaluated using
+#   the shell 'eval' function and placing the conditionally expression in the
+#   form of 'if __expr__ ;'.
+# Parameters
+#   string input
+#     The text input.
+# Printed
+#   All conditional lines and blocks of text inside a conditional evaluating
+#   false are replaced with a blank line.
+#.
+
+ifeval()
+{
+	__level=0
+	__spaces="`printf ' \t\n'`"
+	__curval=''
+
+	printf '%s\n' "$*" | while read line
+	do
+		if [ "${line#If["$__spaces"]}" != "$line" ] ; then
+			__level=$(($__level + 1))
+
+			if [ -z "$__curval" ] ; then
+				eval "if ${line#If} ; then __retval='1' ; else __retval='' ; fi"
+				test -z "$__retval" && __curval=$__level
+			fi
+			echo
+		elif [ "${line#ElseIf["$__spaces"]}" != "$line" ] ; then
+			if [ "$__curval" ] ; then
+				if [ $__level -eq $__curval ] ; then
+					eval "if ${line#ElseIf} ; then __retval='1' ; else __retval='' ; fi"
+					test "$__retval" && __curval=''
+				fi
+			else
+				__curval=$__level
+			fi
+			echo
+		elif [ "${line#Else}" != "$line" ] ; then
+			if [ "$__curval" ] ; then
+				test $__level -eq $__curval && __curval=''
+			else
+				__curval=$__level
+			fi
+			echo
+		elif [ "${line#EndIf}" != "$line" ] ; then
+			test "$__curval" && test $__level -eq $__curval && __curval=''
+			__level=$(($__level - 1))
+			echo
+		else
+			if [ "$__curval" ] ; then
+				echo
+			else
+				echo "$line"
+			fi
+		fi
+	done
+}
+
+##
 # process_sources Function
 #   Inputs the sources configuration file and produces the corresponding
 #   makefile.
@@ -57,7 +118,8 @@ quote()
 
 process_sources()
 {
-	local remaining="`cat "$1"`"
+	remaining="`cat "$1"`"
+	remaining="`ifeval "$remaining"`"
 
 	rm -f "$2"
 
