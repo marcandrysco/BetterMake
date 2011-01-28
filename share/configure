@@ -118,6 +118,8 @@ ifeval()
 
 process_sources()
 {
+	test ! -f "$1" && return 1
+
 	remaining="`cat "$1"`"
 	remaining="`ifeval "$remaining"`"
 
