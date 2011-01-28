@@ -25,7 +25,7 @@ maintainer-clean: clean
 sinclude user.mk
 sinclude sources.mk
 
-Makefile: Makefile.in configure $(wildcard mktests/*) $(wildcard config.args) $(wildcard sources)
+Makefile: Makefile.in configure $(wildcard mktests/* config.args sources user.mk)
 	@echo "rebuilding makefile"
 	./config.status
 
