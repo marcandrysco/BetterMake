@@ -1,4 +1,3 @@
-PREFIX = $(bmake_PATH_PREFIX)
 BIN = $(bmake_PATH_BIN)
 SHARE = $(bmake_PATH_SHARE)
 

@@ -1,4 +1,4 @@
-PREFIX	= $(bmake_PREFIX)
+PREFIX	= $(bmake_PATH_PREFIX)
 CFLAGS	= $(bmake_CFLAGS) -g -O2 
 LDFLAGS = $(bmake_LDFLAGS)
 CC	= $(bmake_CC)
