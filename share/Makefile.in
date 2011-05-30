@@ -26,7 +26,7 @@ bmake_clean:
 
 maintainer-clean: clean
 	$(bmake_clean)
-	rm -f Makefile config.status sources.mk
+	rm -f Makefile config.status src/config.h sources.mk
 
 sinclude user.mk
 sinclude sources.mk
