@@ -266,6 +266,7 @@ src_process()
 	install=""	# Commands for installation
 	clean=""	# Commands for cleaning
 	cleanlist=""	# Files to be cleaned
+	pch=""		# Precompile header dependency
 
 	tmpfile=tempfile
 	ifeval < "$1" > "$tmpfile"
@@ -285,7 +286,7 @@ src_process()
 			src_hasargs "$value" && src_err "Too many arguments passed to the 'Target' directive."
 			test "$target" && src_err "Target already defined as '$target'."
 			target="default"
-			cflags=""
+			cflags="" ; ldflags=""
 			;;
 
 		"Name")
@@ -332,7 +333,7 @@ src_process()
 
 			case "$filetype" in
 			"C")
-				printf '%s.o: %s\n' "${source%.*}" "$source" >> "$2"
+				printf '%s.o: %s%s\n' "${source%.*}" "$source" "$pch" >> "$2"
 				printf '\t$(bmake_PRECC)\n' >> "$2"
 				printf '\t$(CC) $(CFLAGS)%s -c $< -o $@\n\n' "$cflags" >> "$2"
 				objlist="$objlist ${source%.*}.o"
@@ -342,9 +343,9 @@ src_process()
 				test "$dir" = "$source" && dir="."
 
 				if [ -z "$depinclist" ] ; then
-					depinclist="$depinclist $dir/.dep"
-				elif [ "${depinclist%*" $dir/.dep "*}" ] && [ "${depinclist%*" $dir/.dep"}" ] ; then
-					depinclist="$depinclist $dir/.dep"
+					depinclist="$depinclist $dir/.deps/*"
+				elif [ "${depinclist%*" $dir/.deps "*}" ] && [ "${depinclist%*" $dir/.deps"}" ] ; then
+					depinclist="$depinclist $dir/.deps/*"
 				fi
 
 				;;
@@ -359,9 +360,26 @@ src_process()
 			test -z "$target" && src_err "No target defined"
 			while src_nextval value tmpval
 			do
-				echo "[[$tmpval]]"
 				cflags="$cflags $tmpval"
 			done
+			;;
+		
+		"LDFlags")
+			test -z "$target" && src_err "No target defined"
+			while src_nextval value tmpval
+			do
+				ldflags="$ldflags $tmpval"
+			done
+			;;
+		
+		"PCH")
+			test -z "$target" && src_err "No target defined"
+			src_nextval value pch || src_err "Missing header file"
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'PCH' directive."
+			printf '%s.gch: %s%s\n' "$pch" "$pch" "$cdeps" >> "$2"
+			printf '\t$(bmake_PRECC)\n' >> "$2"
+			printf '\t$(CC) $(CFLAGS)%s -c $< -o $@\n\n' "$cflags" >> "$2"
+			pch=" $pch.gch"
 			;;
 
 		"EndTarget")
@@ -371,7 +389,7 @@ src_process()
 			case "$type" in
 			"Application")
 				printf '%s:%s\n' "$target" "$objlist" >> "$2"
-				printf '\t$(LD) $(LDFLAGS) $^ -o $@\n\n' >> "$2"
+				printf '\t$(LD) $(LDFLAGS)%s $^ -o $@\n\n' "$ldflags" >> "$2"
 				targetlist="$targetlist $target"
 				installdeps="$installdeps $target"
 				cleanlist="$cleanlist $target"
