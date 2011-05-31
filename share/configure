@@ -266,7 +266,7 @@ src_process()
 	rm -f "$2"
 
 	package="package"	# Package name
-	pkgver="0.0.0"	# Package version
+	pkgver=""	# Package version
 	lineno=0	# Line number
 	target=""	# Current target
 	type=""		# Target type
@@ -301,9 +301,6 @@ src_process()
 			src_hasargs "$value" && src_err "Too many arguments passed to the 'Package' directive."
 			;;
 
-		"Version")
-			;;
-
 		"Target")
 			src_hasargs "$value" && src_err "Too many arguments passed to the 'Target' directive."
 			test "$target" && src_err "Target already defined as '$target'."
@@ -332,10 +329,15 @@ src_process()
 			;;
 
 		"Version")
-			test -z "$target" && src_err "No target defined"
-			test "$version" && src_err "Version already defined"
-			src_nextval value version || src_err "Invalid parameter"
-			src_hasargs "$value" && src_err "Too many arguments passed to the 'Version' directive."
+			if [ "$target" ] ; then
+				test "$version" && src_err "Target version already defined"
+				src_nextval value version || src_err "Invalid parameter"
+				src_hasargs "$value" && src_err "Too many arguments passed to the 'Version' directive."
+			else
+				test "$version" && src_err "Package version already defined"
+				src_nextval value pkgver || src_err "Invalid parameter"
+				src_hasargs "$value" && src_err "Too many arguments passed to the 'Version' directive."
+			fi
 			;;
 
 		"Source")
@@ -380,7 +382,6 @@ src_process()
 			;;
 		
 		"Extra")
-			test -z "$target" && src_err "No target defined"
 			while src_nextval value tmpval
 			do
 				distlist="$distlist `quote "$tmpval"`"
@@ -475,7 +476,7 @@ src_process()
 	test "$target" && src_err "Unterminated 'Target' directive'"
 
 	pkgname="`quote "$package"`"
-	test "$version" && pkgname="$pkgname-`quote "$version"`"
+	test "$pkgver" && pkgname="$pkgname-`quote "$pkgver"`"
 
 	printf 'bmake_all:%s\n\n' "$targetlist" >> "$2"
 	printf 'bmake_install:%s%s\n\n' "$installdeps" "$install" >> "$2"
