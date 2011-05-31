@@ -3,6 +3,8 @@
 ##
 # ltrim Function
 #   Trim all whitespace off of the front of the input string.
+# Version
+#   1.0
 # Parameters
 #   string input
 #     The input string to be trimmed.
@@ -18,6 +20,8 @@ ltrim()
 ##
 # rtrim Function
 #   Trim all whitespace off of the end of the input string.
+# Version
+#   1.0
 # Parameters
 #   string input
 #     The input string to be trimmed.
@@ -33,6 +37,8 @@ rtrim()
 ##
 # trim Function
 #   Trim all whitespace off of both the front and back of the input string.
+# Version
+#   1.0
 # Parameters
 #   string input
 #     The input string to be trimmed.
@@ -50,7 +56,7 @@ trim()
 #   Given the input string, it places it within single quotes, making sure that
 #   any single quotes within the string are properly escaped.
 # Version
-#   1.0
+#   1.1
 # Parameters
 #   string input
 #     The input text.
@@ -60,17 +66,39 @@ trim()
 
 quote()
 {
-	local str="$*"
+	__quote_str="$*"
+
+	if [ "${__quote_str#*[\'\"\\`printf '\t\v\r\n '`]}" = "$__quote_str" ] ; then
+		printf %s "$__quote_str"
+		return
+	fi
 
 	while [ 1 ]
 	do
-		local piece="${str%%\'*}"
-		test "$piece" = "$str" && break
-		printf "'%s'\\'" "$piece"
-		str="${str#*\'}"
+		__quote_piece="${__quote_str%%\'*}"
+		test "$__quote_piece" = "$__quote_str" && break
+		printf "'%s'\\'" "$__quote_piece"
+		__quote_str="${__quote_str#*\'}"
 	done
 
-	printf "'%s'" "$str"
+	printf %s "'$__quote_str'"
+}
+
+##
+# firstchar Function
+#   Used to process a string by returning the first character of a string.
+# Version
+#   1.0
+# Parameters
+#   string input
+#     The input string.
+# Printed
+#   A first character of the input string.
+#.
+
+firstchar()
+{
+	printf '^s' "${*%"${*#?}"}"
 }
 
 ##
@@ -188,7 +216,6 @@ src_nextval()
 			__tmp="${__tmp#*\\\"}"
 			__tmp_dest="$__tmp_dest\\"
 		done
-
 		eval $1="`quote "$__tmp_val"`"
 		eval $2="`quote "$__tmp_dest"`"
 
@@ -223,23 +250,6 @@ src_err()
 }
 
 ##
-# firstchar Function
-#   Used to process a string by returning the first character of a string.
-# Version
-#   1.0
-# Parameters
-#   string input
-#     The input string.
-# Printed
-#   A first character of the input string.
-#.
-
-firstchar()
-{
-	printf '^s' "${*%"${*#?}"}"
-}
-
-##
 # src_process Function
 #   Inputs the sources configuration file and produces the corresponding
 #   makefile.
@@ -255,6 +265,8 @@ src_process()
 	test ! -f "$1" && return 1
 	rm -f "$2"
 
+	package="package"	# Package name
+	pkgver="0.0.0"	# Package version
 	lineno=0	# Line number
 	target=""	# Current target
 	type=""		# Target type
@@ -267,6 +279,7 @@ src_process()
 	clean=""	# Commands for cleaning
 	cleanlist=""	# Files to be cleaned
 	pch=""		# Precompile header dependency
+	distlist=""	# List of files to distribute
 
 	tmpfile=tempfile
 	ifeval < "$1" > "$tmpfile"
@@ -282,6 +295,15 @@ src_process()
 		value="`trim "${line#"$command"}"`"
 
 		case "$command" in
+		"Package")
+			test "$target" && src_err "'Package' directive not allowed inside the 'Target' directive."
+			src_nextval value package || src_err "Missing argument for the 'Package' directive."
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'Package' directive."
+			;;
+
+		"Version")
+			;;
+
 		"Target")
 			src_hasargs "$value" && src_err "Too many arguments passed to the 'Target' directive."
 			test "$target" && src_err "Target already defined as '$target'."
@@ -338,6 +360,7 @@ src_process()
 				printf '\t$(CC) $(CFLAGS)%s -c $< -o $@\n\n' "$cflags" >> "$2"
 				objlist="$objlist ${source%.*}.o"
 				cleanlist="$cleanlist ${source%.*}.o"
+				distlist="$distlist `quote "$source"`"
 
 				dir="${source%/*}"
 				test "$dir" = "$source" && dir="."
@@ -354,6 +377,14 @@ src_process()
 				src_err "Unknown filetype '$filetype'"
 			esac
 
+			;;
+		
+		"Extra")
+			test -z "$target" && src_err "No target defined"
+			while src_nextval value tmpval
+			do
+				distlist="$distlist `quote "$tmpval"`"
+			done
 			;;
 		
 		"CFlags")
@@ -392,6 +423,7 @@ src_process()
 				printf '\t$(LD) $(LDFLAGS)%s $^ -o $@\n\n' "$ldflags" >> "$2"
 				targetlist="$targetlist $target"
 				installdeps="$installdeps $target"
+				install="$install`printf '\n\tinstall --mode 0755 -D %s "%s/%s"' "$target" "$bindir" "$target"`"
 				cleanlist="$cleanlist $target"
 				;;
 
@@ -442,11 +474,18 @@ src_process()
 	rm -f "$tmpfile"
 	test "$target" && src_err "Unterminated 'Target' directive'"
 
+	pkgname="`quote "$package"`"
+	test "$version" && pkgname="$pkgname-`quote "$version"`"
+
 	printf 'bmake_all:%s\n\n' "$targetlist" >> "$2"
 	printf 'bmake_install:%s%s\n\n' "$installdeps" "$install" >> "$2"
 	printf 'bmake_clean:%s\n\trm -rf%s%s\n\n' "$clean" "$cleanlist" "$depinclist" >> "$2"
+	printf 'bmake_dist:\n' >> "$2"
+	printf '\tif [ -e %s ] ; then rm -rf %s ; fi ; mkdir %s\n' "$pkgname" "$pkgname" "$pkgname" >> "$2"
+	printf '\tcp --parents configure Makefile.in $(wildcard mktests/* sources user.mk)%s %s\n' "$distlist" "$pkgname" >> "$2"
+	printf '\ttar -zcf %s.tar.gz %s/\n' "$pkgname" "$pkgname" >> "$2"
+	printf '\trm -rf %s\n\n' "$pkgname" >> "$2"
 	printf 'sinclude%s\n\n' "$depinclist" >> "$2"
-	#printf 'dist:\n\ttar -zcf pack.tar.gz configure Makefile.in\n\n'
 	printf '.PNOHY: bmake_install bmake_clean\n' >> "$2"
 
 }

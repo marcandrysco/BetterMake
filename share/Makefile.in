@@ -8,13 +8,17 @@ DIST	= configure Makefile.in $(wildcard mktests/* config.args sources user.mk)
 
 all: bmake_all 
 
+bmake_all:
+
 check: test
 
 test: bmake_test
 
-bmake_all:
-
 bmake_test:
+
+dist: bmake_dist
+
+bmake_dist:
 
 install: bmake_install
 
@@ -44,7 +48,7 @@ config.args:
 
 sources:
 
-dist:
-	if [ -z "$(PKGNAME)" ] ; then echo no package name given ; fi
+#dist:
+	#if [ -z "$(PKGNAME)" ] ; then echo no package name given ; fi
 
 .PHONY: all clean maintainer-clean check test dist
