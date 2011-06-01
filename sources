@@ -1,2 +1,12 @@
 Package	"bmake"
 Version	"0.8"
+
+Extra	"bmake"
+Extra	"share/configure"
+Extra	"share/Makefile.in"
+Extra	"share/mktests/00-cc"
+Extra	"share/mktests/00-ld"
+Extra	"share/mktests/10-sanity"
+Extra	"share/mktests/20-restrict"
+Extra	"share/mktests/40-shared"
+Extra	"share/mktests/45-visibility"

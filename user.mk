@@ -20,24 +20,8 @@ user-install:
 	install --mode=0755 -D bmake $(BIN)/bmake
 	sed -i '/^sharedir=/ csharedir='\'"$(SHARE)/bmake"\' $(BIN)/bmake
 
-#dist: user-dist
-
-#user-dist:
-#	if [ -e $(DISTNAME) ] ; then rm -rf $(DISTNAME) ; fi
-#	mkdir $(DISTNAME)
-#	mkdir $(DISTNAME)/share
-#	mkdir $(DISTNAME)/share/mktests
-#	cp Makefile bmake $(DISTNAME)
-#	cp share/mktests/[0-9][0-9]* $(DISTNAME)/share/mktests
-#	cp share/Makefile.in share/configure $(DISTNAME)/share
-#	tar -zcf $(DISTNAME).tar.gz $(DISTNAME)/
-#	tar -jcf $(DISTNAME).tar.bz2 $(DISTNAME)/
-#	rm -rf $(DISTNAME)
-
 clean: user-clean
 
-#user-clean:
-	#rm -f $(DISTNAME).tar.gz $(DISTNAME).tar.bz2
+user-clean:
 
 .PHONY: user-all user-install user-dist user-clean
-
