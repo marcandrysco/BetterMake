@@ -3,6 +3,8 @@ CFLAGS	= $(bmake_CFLAGS) -g -O2
 LDFLAGS = $(bmake_LDFLAGS)
 CC	= $(bmake_CC)
 LD	= $(bmake_LD)
+AR	= ar rcs
+DIST	= configure Makefile.in $(wildcard mktests/* config.args sources user.mk)
 
 all: bmake_all 
 
@@ -43,5 +45,6 @@ config.args:
 sources:
 
 dist:
+	if [ -z "$(PKGNAME)" ] ; then echo no package name given ; fi
 
 .PHONY: all clean maintainer-clean check test dist
