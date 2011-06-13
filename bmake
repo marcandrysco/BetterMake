@@ -19,8 +19,8 @@ usage()
 		fd=$1
 	fi
 
-	cat <<EOF >&$fd
-bmake command [options]
+	cat <<USAGE >&$fd
+bmake <command> [options]
 
 Possible commands are:
   install
@@ -32,7 +32,33 @@ Possible commands are:
   source remove
   source list
   help
-EOF
+USAGE
+}
+
+##
+# usage_test Function
+#   Displays the usage information regarding the list of possible test commands.
+# Parameters
+#   int fd = 1
+#     Optional. The file descriptor number to send it to, often set to '2' for
+#     error out.
+#.
+
+usage_test()
+{
+	if [ "$#" -eq 0 ] ; then
+		fd=1
+	else
+		fd=$1
+	fi
+
+	cat <<USAGE >&$fd
+bmake test <command> [options]
+
+Possible test commands are:
+  add
+  delete
+USAGE
 }
 
 ##
@@ -56,7 +82,7 @@ EOF
 #     option equivalent and 'optname' is the full long name.
 #   -- args ...
 #     After the string '--', all of the parameters are placed after it.
-#     Generally the value '"$@"' should be passed.
+#     Generally the value '$@' should be passed.
 # Return Value
 #   The returned text should be dirctly evaluated using the 'eval' build-in
 #   function. All the parameters will be stored in their respective variables.
@@ -374,7 +400,7 @@ testcmd()
 #   A force install will automatically overwrite any current files.
 # Parameters
 #   string params
-#     The set of parameters to the command, generally '"$@"'.
+#     The set of parameters to the command, generally '$@'.
 #.
 
 cmd_install()
@@ -406,30 +432,140 @@ USAGE
 	copyfile "Makefile.in"
 	copyfile "configure" 0755
 	test ! -d mktests && mkdir mktests
-	for file in "mktests/00-cc" "mktests/00-ld"
-	do
-		copyfile "$file" 0755
-	done
 }
+
+##
+# cmd_update Function
+#   Updates the currently existing build files, replacing old files with the
+#   new versions. Without the '--force' option, if any of the previous files
+#   were modified, then the update will abort and an error will be reported.
+# Parameters
+#   string params
+#     The set of parameters to the command, generally '$@'.
+#.
 
 cmd_update()
 {
-	for file in "Makefile.in" "configure"
-	do
-		chkfile "$file" && continue
+	help="" ; force=""
+	eval `getopt_long f? f,force ?,help -- "$@"`
+	if [ -n "$err" ] ; then echo "$err" ; exit 1 ; fi
 
-		echo "error: $file has been modified since the last install or update" >&2
-		exit 1
-	done
+	if [ "$help" ] ; then
+		cat <<USAGE
+usage: bmake update [-f | --force]
+Options
+  -f, --force   Forces all files to be updated, overwriting existing files
+      --help    Produce this help message
+USAGE
+		exit 0
+	fi
+
+	if [ -z "$force" ] ; then 
+		fail=""
+		for file in "Makefile.in" "configure" "mktests/*"
+		do
+			test -f "$file" || continue
+			chkfile "$file" && continue
+
+			echo "error: $file has been modified since the last install or update" >&2
+			fail=1
+		done
+
+		test "$fail" && exit 1
+	fi
 
 	copyfile "Makefile.in"
 	copyfile "configure" 0755
 	test ! -d mktests && mkdir mktests
+	for file in "mktests/*"
+	do
+		test -f "$file" || continue
+		copyfile "$file" 0755
+	done
+}
 
-	#for file in "mktests/00-cc" "mktests/00-ld"
-	#do
-		#copyfile "$file" 0755
-	#done
+##
+# cmd_test Function
+#   Determine the desired test command, producing an error on invalid input.
+# Parameters
+#   string params
+#     The set of parameters to the command, generally '$@'.
+#.
+
+cmd_test()
+{
+	if [ "$#" -eq 0 ] ; then
+		usage_test
+		exit
+	fi
+
+	cmd="$1" ; shift
+	case "$cmd" in
+	add)
+		cmd_test_add "$@"
+		;;
+
+	--help)
+		usage_test
+		exit
+		;;
+
+	*)
+		echo "invalid command 'test $cmd'" >&2
+		echo >&2
+		usage_test 2
+		exit 1
+	esac
+}
+
+##
+# cmd_test_add
+#   Adds the given tests to the current build system, verifying that they have
+#   not previously been installed.
+# Parameters
+#   string params
+#     The set of parameters to the command, generally '$@'.
+#.
+
+cmd_test_add()
+{
+	help="" ; force=""
+	eval `getopt_long f? f,force ?,help -- "$@"`
+	if [ -n "$err" ] ; then echo "$err" ; exit 1 ; fi
+
+	if [ "$help" ] ; then
+		cat <<USAGE
+usage: bmake install [-f | --force]
+Options
+  -f, --force   Forces all files to be installed overwriting existing files
+      --help    Produce this help message
+USAGE
+		exit 0
+	fi
+
+	test -z "$force" && test ! -d mktests && echo "bmake build system not detected, aborting" >&2 && exit 1
+
+	for name in "$@"
+	do
+		test -z "${name%%-*}" && continue
+
+		match=""
+		for file in "$sharedir"/mktests/*
+		do
+			if [ "${file##*/[0-9][0-9]-}" = "$name" ] ; then
+				match="${file#"$sharedir/"}" ; break
+			fi
+		done
+
+		test -z "$match" && echo "test '$name' not found, aborting" >&2 && exit 1
+
+		if [ ! "$force" ] && [ -f "$match" ] ; then
+			echo "test '$name' already exists, skipping"
+		else
+			copyfile "$match" 0755
+			echo "installed test '$name'"
+		fi
+	done
 }
 
 # Verify we have a command
@@ -439,10 +575,11 @@ if [ "$#" -eq 0 ] ; then
 fi
 
 # Process the current command, passing to the proper handler
-cmd=$1 ; shift
+cmd="$1" ; shift
 case "$cmd" in
 	install) cmd_install "$@" ;;
 	update) cmd_update "$@" ;;
+	test) cmd_test "$@" ;;
 	
 	target | test )
 		"${cmd}cmd" "$@" ;;
@@ -452,6 +589,8 @@ case "$cmd" in
 		;;
 
 	*)
+		echo "invalid command '$cmd'" >&2
+		echo >&2
 		usage 2
 		exit 1
 		;;

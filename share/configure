@@ -3,6 +3,8 @@
 ##
 # ltrim Function
 #   Trim all whitespace off of the front of the input string.
+# Version
+#   1.0
 # Parameters
 #   string input
 #     The input string to be trimmed.
@@ -18,6 +20,8 @@ ltrim()
 ##
 # rtrim Function
 #   Trim all whitespace off of the end of the input string.
+# Version
+#   1.0
 # Parameters
 #   string input
 #     The input string to be trimmed.
@@ -33,6 +37,8 @@ rtrim()
 ##
 # trim Function
 #   Trim all whitespace off of both the front and back of the input string.
+# Version
+#   1.0
 # Parameters
 #   string input
 #     The input string to be trimmed.
@@ -50,7 +56,7 @@ trim()
 #   Given the input string, it places it within single quotes, making sure that
 #   any single quotes within the string are properly escaped.
 # Version
-#   1.0
+#   1.1
 # Parameters
 #   string input
 #     The input text.
@@ -60,17 +66,39 @@ trim()
 
 quote()
 {
-	local str="$*"
+	__quote_str="$*"
+
+	if [ "${__quote_str#*[\'\"\\`printf '\t\v\r\n '`]}" = "$__quote_str" ] ; then
+		printf %s "$__quote_str"
+		return
+	fi
 
 	while [ 1 ]
 	do
-		local piece="${str%%\'*}"
-		test "$piece" = "$str" && break
-		printf "'%s'\\'" "$piece"
-		str="${str#*\'}"
+		__quote_piece="${__quote_str%%\'*}"
+		test "$__quote_piece" = "$__quote_str" && break
+		printf "'%s'\\'" "$__quote_piece"
+		__quote_str="${__quote_str#*\'}"
 	done
 
-	printf "'%s'" "$str"
+	printf %s "'$__quote_str'"
+}
+
+##
+# firstchar Function
+#   Used to process a string by returning the first character of a string.
+# Version
+#   1.0
+# Parameters
+#   string input
+#     The input string.
+# Printed
+#   A first character of the input string.
+#.
+
+firstchar()
+{
+	printf '^s' "${*%"${*#?}"}"
 }
 
 ##
@@ -93,7 +121,7 @@ ifeval()
 	__spaces="`printf ' \t\n'`"
 	__curval=''
 
-	printf '%s\n' "$*" | while read line
+	while read line
 	do
 		if [ "${line#If["$__spaces"]}" != "$line" ] ; then
 			__level=$(($__level + 1))
@@ -123,7 +151,6 @@ ifeval()
 		elif [ "${line#EndIf}" != "$line" ] ; then
 			test "$__curval" && test $__level -eq $__curval && __curval=''
 			__level=$(($__level - 1))
-			echo
 		else
 			if [ "$__curval" ] ; then
 				echo
@@ -218,25 +245,9 @@ src_nextval()
 
 src_err()
 {
+	test -f "$tmpfile" && rm -f "$tmpfile"
 	echo "sources: $lineno: $*" >&2
 	exit 1
-}
-
-##
-# firstchar Function
-#   Used to process a string by returning the first character of a string.
-# Version
-#   1.0
-# Parameters
-#   string input
-#     The input string.
-# Printed
-#   A first character of the input string.
-#.
-
-firstchar()
-{
-	printf '^s' "${*%"${*#?}"}"
 }
 
 ##
@@ -255,6 +266,8 @@ src_process()
 	test ! -f "$1" && return 1
 	rm -f "$2"
 
+	package="package"	# Package name
+	pkgver=""	# Package version
 	lineno=0	# Line number
 	target=""	# Current target
 	type=""		# Target type
@@ -266,6 +279,11 @@ src_process()
 	install=""	# Commands for installation
 	clean=""	# Commands for cleaning
 	cleanlist=""	# Files to be cleaned
+	pch=""		# Precompile header dependency
+	distlist=""	# List of files to distribute
+
+	tmpfile=tempfile
+	ifeval < "$1" > "$tmpfile"
 
 	while read -r line
 	do
@@ -278,10 +296,17 @@ src_process()
 		value="`trim "${line#"$command"}"`"
 
 		case "$command" in
+		"Package")
+			test "$target" && src_err "'Package' directive not allowed inside the 'Target' directive."
+			src_nextval value package || src_err "Missing argument for the 'Package' directive."
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'Package' directive."
+			;;
+
 		"Target")
 			src_hasargs "$value" && src_err "Too many arguments passed to the 'Target' directive."
 			test "$target" && src_err "Target already defined as '$target'."
 			target="default"
+			cflags="" ; ldflags=""
 			;;
 
 		"Name")
@@ -296,12 +321,29 @@ src_process()
 			src_hasargs "$value" && src_err "Too many arguments passed to the 'Type' directive."
 
 			case "$type" in
-			"Application" | "Library")
+			"Application")
 				;;
+
+ 			"Library")
+				test "$pic" && cflags="$cflags -fpic"
+				;;
+
 			*)
 				src_err "Invalid target type '$type'"
 			esac
 
+			;;
+
+		"Version")
+			if [ "$target" ] ; then
+				test "$version" && src_err "Target version already defined"
+				src_nextval value version || src_err "Invalid parameter"
+				src_hasargs "$value" && src_err "Too many arguments passed to the 'Version' directive."
+			else
+				test "$version" && src_err "Package version already defined"
+				src_nextval value pkgver || src_err "Invalid parameter"
+				src_hasargs "$value" && src_err "Too many arguments passed to the 'Version' directive."
+			fi
 			;;
 
 		"Source")
@@ -321,16 +363,61 @@ src_process()
 
 			case "$filetype" in
 			"C")
-				printf '%s.o: %s\n' "${source%.*}" "$source" >> "$2"
+				printf '%s.o: %s%s\n' "${source%.*}" "$source" "$pch" >> "$2"
 				printf '\t$(bmake_PRECC)\n' >> "$2"
-				printf '\t$(CC) $(CFLAGS) -c $< -o $@\n\n' >> "$2"
+				printf '\t$(CC) $(CFLAGS)%s -c $< -o $@\n\n' "$cflags" >> "$2"
 				objlist="$objlist ${source%.*}.o"
+				cleanlist="$cleanlist ${source%.*}.o"
+				distlist="$distlist `quote "$source"`"
+
+				dir="${source%/*}"
+				test "$dir" = "$source" && dir="."
+
+				if [ -z "$depinclist" ] ; then
+					depinclist="$depinclist $dir/.deps/*"
+				elif [ "${depinclist%*" $dir/.deps "*}" ] && [ "${depinclist%*" $dir/.deps"}" ] ; then
+					depinclist="$depinclist $dir/.deps/*"
+				fi
+
 				;;
 
 			*)
 				src_err "Unknown filetype '$filetype'"
 			esac
 
+			;;
+		
+		"Extra")
+			while src_nextval value tmpval
+			do
+				distlist="$distlist `quote "$tmpval"`"
+			done
+			;;
+		
+		"CFlags")
+			test -z "$target" && src_err "No target defined"
+			while src_nextval value tmpval
+			do
+				cflags="$cflags $tmpval"
+			done
+			;;
+		
+		"LDFlags")
+			test -z "$target" && src_err "No target defined"
+			while src_nextval value tmpval
+			do
+				ldflags="$ldflags $tmpval"
+			done
+			;;
+		
+		"PCH")
+			test -z "$target" && src_err "No target defined"
+			src_nextval value pch || src_err "Missing header file"
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'PCH' directive."
+			printf '%s.gch: %s%s\n' "$pch" "$pch" "$cdeps" >> "$2"
+			printf '\t$(bmake_PRECC)\n' >> "$2"
+			printf '\t$(CC) $(CFLAGS)%s -c $< -o $@\n\n' "$cflags" >> "$2"
+			pch=" $pch.gch"
 			;;
 
 		"EndTarget")
@@ -340,47 +427,49 @@ src_process()
 			case "$type" in
 			"Application")
 				printf '%s:%s\n' "$target" "$objlist" >> "$2"
-				printf '\t$(LD) $(LDFLAGS) $^ -o $@\n\n' >> "$2"
+				printf '\t$(LD) $(LDFLAGS)%s $^ -o $@\n\n' "$ldflags" >> "$2"
 				targetlist="$targetlist $target"
 				installdeps="$installdeps $target"
+				install="$install`printf '\n\tinstall --mode 0755 -D %s "%s/%s"' "$target" "$bindir" "$target"`"
 				cleanlist="$cleanlist $target"
 				;;
-
-			"Library")
-				printf '%s.a:%s\n' "$target" "$objlist" >> "$2"
-				printf '\t$(AR) $@ $^\n\n' >> "$2"
-				targetlist="$targetlist $target.a"
-				installdeps="$installdeps $target.a"
-				cleanlist="$cleanlist $target.a"
-				;;
+			*)
+				src_err "Invalid target type '$type'"
 			esac
 
-#				printf 'bmake_all: lib%s.a\n\n' "$target" >> "$2"
-#				printf 'lib%s.a: %s\n\t%s\n\n' "$target" "$obj" "`printf '%sar rcs $@ $^' "$toolchain"`" >> "$2"
-#				installdeps="$installdeps lib$target.a"
-#				install="$install`printf '\n\tinstall --mode 0644 -D lib%s.a "%s/lib%s.a"' "$target" "$libdir" "$target"`"
-#				clean="$clean`printf '\n\trm -f lib%s.a' "$target"`"
-#				if [ "$dynlib" = "so" ] ; then
-#					printf 'bmake_all: lib%s.so.%s\n\n' "$target" "$version" >> "$2"
-#					printf 'lib%s.so.%s: %s\n' "$target" "$version" "$obj" >> "$2"
-#					printf '\t$(LD) $(LDFLAGS) -shared -Wl,-soname,lib%s.so.%s -o $@ $^%s\n' "$target" "$shortversion" "$ldflags" >> "$2"
-#					printf '\tln -fs lib%s.so.%s lib%s.so.%s\n' "$target" "$version" "$target" "$shortversion" >> "$2"
-#					printf '\tln -fs lib%s.so.%s lib%s.so\n\n' "$target" "$version" "$target" >> "$2"
-#					cflags="$cflags -fpic"
-#					installdeps="$installdeps `printf 'lib%s.so.%s' "$target" "$version"`"
-#					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.so.%s "%s/lib%s.so.%s"' "$target" "$version" "$libdir" "$target" "$version"`"
-#					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so"' "$target" "$version" "$libdir" "$target"`"
-#					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$target" "$shortversion"`"
-#					clean="$clean`printf '\n\trm -rf lib%s.so.%s lib%s.so.%s lib%s.so' "$target" "$version" "$target" "$shortversion" "$target"`"
-#				elif [ "$dynlib" = "dll" ] ; then
-#					printf 'bmake_all: lib%s.dll\n\n' "$target" >> "$2"
-#					printf 'lib%s.dll: %s\n' "$target" "$obj" >> "$2"
-#					printf '\t$(LD) $(LDFLAGS) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s\n' "$target" "$ldflags" >> "$2"
-#					installdeps="$installdeps `printf 'lib%s.dll' "$target"`"
-#					install="$install`printf '\n\tinstall --mode 0644 -D lib%s.dll.a "%s/lib%s.dll.a"\n' "$target" "$libdir" "$target"`"
-#					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.dll "%s/lib%s.dll"' "$target" "$bindir" "$target"`"
-#					clean="$clean`printf '\n\trm -rf lib%s.dll lib%s.dll.a' "$target" "$target"`"
-#				fi
+			"Library")
+				printf 'lib%s.a:%s\n' "$target" "$objlist" >> "$2"
+				printf '\t$(AR) $@ $^\n\n' >> "$2"
+				targetlist="$targetlist lib$target.a"
+				installdeps="$installdeps lib$target.a"
+				install="$install`printf '\n\tinstall --mode 0644 -D lib%s.a "%s/lib%s.a"' "$target" "$libdir" "$target"`"
+				cleanlist="$cleanlist lib$target.a"
+
+				if [ "$dynlib" = "so" ] ; then
+					test -z "$version" && version="0.0.1"
+					shortversion="${version%%.*}"
+					
+					printf 'lib%s.so.%s:%s\n' "$target" "$version" "$objlist" >> "$2"
+					printf '\t$(LD) $(LDFLAGS) -shared -Wl,-soname,lib%s.so.%s -o $@ $^%s\n' "$target" "$shortversion" "$ldflags" >> "$2"
+					printf '\tln -fs lib%s.so.%s lib%s.so.%s\n' "$target" "$version" "$target" "$shortversion" >> "$2"
+					printf '\tln -fs lib%s.so.%s lib%s.so\n\n' "$target" "$version" "$target" >> "$2"
+					targetlist="$targetlist `printf 'lib%s.so.%s' "$target" "$version"`"
+					installdeps="$installdeps `printf 'lib%s.so.%s' "$target" "$version"`"
+					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.so.%s "%s/lib%s.so.%s"' "$target" "$version" "$libdir" "$target" "$version"`"
+					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so"' "$target" "$version" "$libdir" "$target"`"
+					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$target" "$shortversion"`"
+					cleanlist="$cleanlist `printf 'lib%s.so.%s' "$target" "$version"`"
+				elif [ "$dynlib" = "dll" ] ; then
+					printf 'lib%s.dll: %s\n' "$target" "$obj" >> "$2"
+					printf '\t$(LD) $(LDFLAGS) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s\n' "$target" "$ldflags" >> "$2"
+					targetlist="$targetlist `printf 'lib%s.dll' "$target"`"
+					installdeps="$installdeps `printf 'lib%s.dll' "$target"`"
+					install="$install`printf '\n\tinstall --mode 0644 -D lib%s.dll.a "%s/lib%s.dll.a"\n' "$target" "$libdir" "$target"`"
+					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.dll "%s/lib%s.dll"' "$target" "$bindir" "$target"`"
+					cleanlist="$cleanlist `printf 'lib%s.dll lib%s.dll.a' "$target" "$target"`"
+				fi
+				;;
+			esac
 
 			target=""
 			;;
@@ -390,13 +479,22 @@ src_process()
 			echo "$command"
 			;;
 		esac
-	done < "$1"
+	done < "$tmpfile"
 
+	rm -f "$tmpfile"
 	test "$target" && src_err "Unterminated 'Target' directive'"
+
+	pkgname="`quote "$package"`"
+	test "$pkgver" && pkgname="$pkgname-`quote "$pkgver"`"
 
 	printf 'bmake_all:%s\n\n' "$targetlist" >> "$2"
 	printf 'bmake_install:%s%s\n\n' "$installdeps" "$install" >> "$2"
-	printf 'bmake_clean:%s\n\trm -rf%s\n\n' "$clean" "$cleanlist" >> "$2"
+	printf 'bmake_clean:%s\n\trm -rf%s%s\n\n' "$clean" "$cleanlist" "$depinclist" >> "$2"
+	printf 'bmake_dist:\n' >> "$2"
+	printf '\tif [ -e %s ] ; then rm -rf %s ; fi ; mkdir %s\n' "$pkgname" "$pkgname" "$pkgname" >> "$2"
+	printf '\tcp --parents configure Makefile.in $(wildcard mktests/* sources user.mk)%s %s\n' "$distlist" "$pkgname" >> "$2"
+	printf '\ttar -zcf %s.tar.gz %s/\n' "$pkgname" "$pkgname" >> "$2"
+	printf '\trm -rf %s\n\n' "$pkgname" >> "$2"
 	printf 'sinclude%s\n\n' "$depinclist" >> "$2"
 	#printf 'dist:\n\ttar -zcf pack.tar.gz configure Makefile.in\n\n'
 	printf '.PNOHY: bmake_install bmake_clean\n' >> "$2"
@@ -418,6 +516,7 @@ exec_tests()
 #define BMAKE__PATH_PREFIX	"$prefix"
 #define BMAKE__PATH_BIN		"$bindir"
 #define BMAKE__PATH_LIB		"$libdir"
+#define BMAKE__PATH_INCLUDE	"$includedir"
 #define BMAKE__PATH_SHARE	"$sharedir"
 #define BMAKE__PATH_CONF	"$confdir"
 
@@ -445,6 +544,7 @@ EOF
 	echo "bmake_PATH_PREFIX = $prefix" >> Makefile
 	echo "bmake_PATH_BIN = $bindir" >> Makefile
 	echo "bmake_PATH_LIB = $libdir" >> Makefile
+	echo "bmake_PATH_INCLUDE = $includedir" >> Makefile
 	echo "bmake_PATH_SHARE = $sharedir" >> Makefile
 	echo "bmake_PATH_CONF = $confdir" >> Makefile
 
@@ -509,10 +609,10 @@ do
 		--host)
 			test -z "$opt" && continue ; host="$opt" ;;
 
-		--toolchain | --prefix | --libdir | --bindir | --confdir | --depdir)
+		--toolchain | --prefix | --libdir | --bindir | --includedir | --confdir | --depdir)
 			test -z "$opt" && continue ; eval "${optname#--}=`quote "$opt"`" ;;
 
-		--includedir | --infodir | --sysconfdir | --localstatedir | --libexedir)
+		--infodir | --sysconfdir | --localstatedir | --libexedir)
 			echo "option '$optname' not supported yet" ;;
 
 		--disable-maintainer-mode | --disable-dependency-tracking)
@@ -536,6 +636,7 @@ test ! -z $optname && echo "'$optname' requires parameter" && exit 1
 test -z "$prefix" && prefix="/usr/local"
 test -z "$bindir" && bindir="$prefix/bin"
 test -z "$libdir" && libdir="$prefix/lib"
+test -z "$includedir" && includedir="$prefix/include"
 test -z "$sharedir" && sharedir="$prefix/share"
 test -z "$confdir" && confdir="$prefix/etc"
 test -z "$depdir" && depdir=".deps"
