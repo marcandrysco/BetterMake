@@ -511,6 +511,7 @@ exec_tests()
 #define BMAKE__PATH_PREFIX	"$prefix"
 #define BMAKE__PATH_BIN		"$bindir"
 #define BMAKE__PATH_LIB		"$libdir"
+#define BMAKE__PATH_INCLUDE	"$includedir"
 #define BMAKE__PATH_SHARE	"$sharedir"
 #define BMAKE__PATH_CONF	"$confdir"
 
@@ -538,6 +539,7 @@ EOF
 	echo "bmake_PATH_PREFIX = $prefix" >> Makefile
 	echo "bmake_PATH_BIN = $bindir" >> Makefile
 	echo "bmake_PATH_LIB = $libdir" >> Makefile
+	echo "bmake_PATH_INCLUDE = $includedir" >> Makefile
 	echo "bmake_PATH_SHARE = $sharedir" >> Makefile
 	echo "bmake_PATH_CONF = $confdir" >> Makefile
 
@@ -602,10 +604,10 @@ do
 		--host)
 			test -z "$opt" && continue ; host="$opt" ;;
 
-		--toolchain | --prefix | --libdir | --bindir | --confdir | --depdir)
+		--toolchain | --prefix | --libdir | --bindir | --includedir | --confdir | --depdir)
 			test -z "$opt" && continue ; eval "${optname#--}=`quote "$opt"`" ;;
 
-		--includedir | --infodir | --sysconfdir | --localstatedir | --libexedir)
+		--infodir | --sysconfdir | --localstatedir | --libexedir)
 			echo "option '$optname' not supported yet" ;;
 
 		--disable-maintainer-mode | --disable-dependency-tracking)
@@ -629,6 +631,7 @@ test ! -z $optname && echo "'$optname' requires parameter" && exit 1
 test -z "$prefix" && prefix="/usr/local"
 test -z "$bindir" && bindir="$prefix/bin"
 test -z "$libdir" && libdir="$prefix/lib"
+test -z "$includedir" && includedir="$prefix/include"
 test -z "$sharedir" && sharedir="$prefix/share"
 test -z "$confdir" && confdir="$prefix/etc"
 test -z "$depdir" && depdir=".deps"
