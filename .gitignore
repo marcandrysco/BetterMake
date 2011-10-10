@@ -1,3 +1,6 @@
 *.swp
 sources.mk
+Makefile
 config.args
+config.status
+config.log

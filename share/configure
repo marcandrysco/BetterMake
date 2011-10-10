@@ -490,7 +490,7 @@ src_process()
 
 	printf 'bmake_all:%s\n\n' "$targetlist" >> "$2"
 	printf 'bmake_install:%s%s\n\n' "$installdeps" "$install" >> "$2"
-	printf 'bmake_clean:%s\n\trm -rf%s%s\n\n' "$clean" "$cleanlist" "$depinclist" >> "$2"
+	printf 'bmake_clean:%s\n\trm -rf%s%s\n\n' "config.status" "config.log" "$clean" "$cleanlist" "$depinclist" >> "$2"
 	printf 'bmake_dist:\n' >> "$2"
 	printf '\tif [ -e %s ] ; then rm -rf %s ; fi ; mkdir %s\n' "$pkgname" "$pkgname" "$pkgname" >> "$2"
 	printf '\tcp --parents configure Makefile.in $(wildcard mktests/* sources user.mk)%s %s\n' "$distlist" "$pkgname" >> "$2"
