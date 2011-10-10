@@ -427,15 +427,12 @@ src_process()
 			case "$type" in
 			"Application")
 				printf '%s:%s\n' "$target" "$objlist" >> "$2"
-				printf '\t$(LD) $(LDFLAGS)%s $^ -o $@\n\n' "$ldflags" >> "$2"
+				printf '\t$(LD) $^ -o $@ $(LDFLAGS)%s\n\n' "$ldflags" >> "$2"
 				targetlist="$targetlist $target"
 				installdeps="$installdeps $target"
 				install="$install`printf '\n\tinstall --mode 0755 -D %s "%s/%s"' "$target" "$bindir" "$target"`"
 				cleanlist="$cleanlist $target"
 				;;
-			*)
-				src_err "Invalid target type '$type'"
-			esac
 
 			"Library")
 				printf 'lib%s.a:%s\n' "$target" "$objlist" >> "$2"
@@ -460,14 +457,18 @@ src_process()
 					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$target" "$shortversion"`"
 					cleanlist="$cleanlist `printf 'lib%s.so.%s' "$target" "$version"`"
 				elif [ "$dynlib" = "dll" ] ; then
-					printf 'lib%s.dll: %s\n' "$target" "$obj" >> "$2"
-					printf '\t$(LD) $(LDFLAGS) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s\n' "$target" "$ldflags" >> "$2"
+					printf 'lib%s.dll:%s\n' "$target" "$objlist" >> "$2"
+					printf '\t$(LD) $(LDFLAGS) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s\n\n' "$target" "$ldflags" >> "$2"
 					targetlist="$targetlist `printf 'lib%s.dll' "$target"`"
 					installdeps="$installdeps `printf 'lib%s.dll' "$target"`"
 					install="$install`printf '\n\tinstall --mode 0644 -D lib%s.dll.a "%s/lib%s.dll.a"\n' "$target" "$libdir" "$target"`"
 					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.dll "%s/lib%s.dll"' "$target" "$bindir" "$target"`"
 					cleanlist="$cleanlist `printf 'lib%s.dll lib%s.dll.a' "$target" "$target"`"
 				fi
+
+				;;
+			*)
+				src_err "Invalid target type '$type'"
 				;;
 			esac
 
