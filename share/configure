@@ -305,7 +305,7 @@ src_process()
 			src_hasargs "$value" && src_err "Too many arguments passed to the 'Target' directive."
 			test "$target" && src_err "Target already defined as '$target'."
 			target="default"
-			cflags="" ; reqcflags = "" ; ldflags=""
+			cflags="" ; reqcflags="" ; ldflags=""
 			;;
 
 		"Name")
