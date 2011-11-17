@@ -49,6 +49,5 @@ config.args:
 sources:
 
 dist:
-	if [ -z "$(PKGNAME)" ] ; then echo no package name given ; fi
 
 .PHONY: all clean maintainer-clean check test dist

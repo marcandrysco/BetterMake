@@ -84,6 +84,16 @@ quote()
 	printf %s "'$__quote_str'"
 }
 
+replace()
+{
+	printf '%s' "${1%%"$2"*}"
+
+	if [ -z "${1%%*"$2"*}" ] ; then
+		printf '%s' "$3"
+		replace "${1#*"$2"}" "$2" "$3"
+	fi
+}
+
 ##
 # firstchar Function
 #   Used to process a string by returning the first character of a string.
@@ -339,7 +349,7 @@ src_process()
 				src_nextval value version || src_err "Invalid parameter"
 				src_hasargs "$value" && src_err "Too many arguments passed to the 'Version' directive."
 			else
-				test "$version" && src_err "Package version already defined"
+				test "$pkgver" && src_err "Package version already defined"
 				src_nextval value pkgver || src_err "Invalid parameter"
 				src_hasargs "$value" && src_err "Too many arguments passed to the 'Version' directive."
 			fi
@@ -351,7 +361,7 @@ src_process()
 			src_nextval value filetype || {
 				case $source in
 				*.c)
-					filetype="C"
+					filetype="C,H"
 					;;
 
 				*)
@@ -359,6 +369,14 @@ src_process()
 				esac
 			}
 			src_hasargs "$value" && src_err "Too many arguments passed to the '$command' directive."
+
+			if [ -z "${filetype%%*,H}" ] ; then
+				filetype="${filetype%,H}"
+				if [ -e "${source%.*}.h" ] ; then
+					header="${source%.*}.h"
+					distlist="$distlist `quote "$header"`"
+				fi
+			fi
 
 			case "$filetype" in
 			"C")
@@ -455,6 +473,7 @@ src_process()
 				cleanlist="$cleanlist lib$target.a"
 
 				if [ "$dynlib" = "so" ] ; then
+					test -z "$version" && version="$pkgver"
 					test -z "$version" && version="0.0.1"
 					shortversion="${version%%.*}"
 					
@@ -467,7 +486,7 @@ src_process()
 					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.so.%s "%s/lib%s.so.%s"' "$target" "$version" "$libdir" "$target" "$version"`"
 					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so"' "$target" "$version" "$libdir" "$target"`"
 					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$target" "$shortversion"`"
-					cleanlist="$cleanlist `printf 'lib%s.so.%s' "$target" "$version"`"
+					cleanlist="$cleanlist `printf 'lib%s.so.%s lib%s.so.%s lib%s.so' "$target" "$version" "$target" "$shortversion" "$target"`"
 				elif [ "$dynlib" = "dll" ] ; then
 					printf 'lib%s.dll:%s\n' "$target" "$objlist" >> "$2"
 					printf '\t$(LD) $(LDFLAGS) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s\n\n' "$target" "$ldflags" >> "$2"
@@ -502,7 +521,7 @@ src_process()
 
 	printf 'bmake_all:%s\n\n' "$targetlist" >> "$2"
 	printf 'bmake_install:%s%s\n\n' "$installdeps" "$install" >> "$2"
-	printf 'bmake_clean:%s\n\trm -rf config.status config.log%s%s\n\n' "$clean" "$cleanlist" "$depinclist" >> "$2"
+	printf 'bmake_clean:%s\n\trm -rf config.log%s%s\n\n' "$clean" "$cleanlist" "$depinclist" >> "$2"
 	printf 'bmake_dist:\n' >> "$2"
 	printf '\tif [ -e %s ] ; then rm -rf %s ; fi ; mkdir %s\n' "$pkgname" "$pkgname" "$pkgname" >> "$2"
 	printf '\tcp --parents configure Makefile.in $(wildcard mktests/* sources user.mk)%s %s\n' "$distlist" "$pkgname" >> "$2"
