@@ -290,6 +290,7 @@ src_process()
 	cleanlist=""	# Files to be cleaned
 	pch=""		# Precompile header dependency
 	distlist=""	# List of files to distribute
+	testlist=""	# List of test targets
 
 	tmpfile=tempfile
 	ifeval < "$1" > "$tmpfile"
@@ -315,7 +316,7 @@ src_process()
 			src_hasargs "$value" && src_err "Too many arguments passed to the 'Target' directive."
 			test "$target" && src_err "Target already defined as '$target'."
 			target="default"
-			cflags="" ; reqcflags="" ; ldflags=""
+			cflags="" ; reqcflags="" ; ldflags="" ; objlist=""
 			;;
 
 		"Name")
@@ -331,6 +332,9 @@ src_process()
 
 			case "$type" in
 			"Application")
+				;;
+
+			"TestApplication")
 				;;
 
  			"Library")
@@ -457,11 +461,17 @@ src_process()
 			case "$type" in
 			"Application")
 				printf '%s:%s\n' "$target" "$objlist" >> "$2"
-				printf '\t$(LD) $^ -o $@ $(LDFLAGS)%s\n\n' "$ldflags" >> "$2"
+				printf '\t$(LD) $^ -o $@%s $(LDFLAGS)\n\n' "$ldflags" >> "$2"
 				targetlist="$targetlist $target"
 				installdeps="$installdeps $target"
 				install="$install`printf '\n\tinstall --mode 0755 -D %s "%s/%s"' "$target" "$bindir" "$target"`"
 				cleanlist="$cleanlist $target"
+				;;
+
+			"TestApplication")
+				printf '%s:%s\n' "$target" "$objlist" >> "$2"
+				printf '\t$(LD) $^ -o $@%s $(LDFLAGS)\n\n' "$ldflags" >> "$2"
+				testlist="$testlist $target"
 				;;
 
 			"Library")
@@ -478,7 +488,7 @@ src_process()
 					shortversion="${version%%.*}"
 					
 					printf 'lib%s.so.%s:%s\n' "$target" "$version" "$objlist" >> "$2"
-					printf '\t$(LD) $(LDFLAGS) -shared -Wl,-soname,lib%s.so.%s -o $@ $^%s\n' "$target" "$shortversion" "$ldflags" >> "$2"
+					printf '\t$(LD) $(LDFLAGS)%s -shared -Wl,-soname,lib%s.so.%s -o $@ $^\n' "$ldflags" "$target" "$shortversion" >> "$2"
 					printf '\tln -fs lib%s.so.%s lib%s.so.%s\n' "$target" "$version" "$target" "$shortversion" >> "$2"
 					printf '\tln -fs lib%s.so.%s lib%s.so\n\n' "$target" "$version" "$target" >> "$2"
 					targetlist="$targetlist `printf 'lib%s.so.%s' "$target" "$version"`"
@@ -489,7 +499,7 @@ src_process()
 					cleanlist="$cleanlist `printf 'lib%s.so.%s lib%s.so.%s lib%s.so' "$target" "$version" "$target" "$shortversion" "$target"`"
 				elif [ "$dynlib" = "dll" ] ; then
 					printf 'lib%s.dll:%s\n' "$target" "$objlist" >> "$2"
-					printf '\t$(LD) $(LDFLAGS) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s\n\n' "$target" "$ldflags" >> "$2"
+					printf '\t$(LD) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s $(LDFLAGS)\n\n' "$target" "$ldflags" >> "$2"
 					targetlist="$targetlist `printf 'lib%s.dll' "$target"`"
 					installdeps="$installdeps `printf 'lib%s.dll' "$target"`"
 					install="$install`printf '\n\tinstall --mode 0644 -D lib%s.dll.a "%s/lib%s.dll.a"\n' "$target" "$libdir" "$target"`"
@@ -520,6 +530,7 @@ src_process()
 	test "$pkgver" && pkgname="$pkgname-`quote "$pkgver"`"
 
 	printf 'bmake_all:%s\n\n' "$targetlist" >> "$2"
+	printf 'bmake_test:%s\n\n' "$testlist" >> "$2"
 	printf 'bmake_install:%s%s\n\n' "$installdeps" "$install" >> "$2"
 	printf 'bmake_clean:%s\n\trm -rf config.log%s%s\n\n' "$clean" "$cleanlist" "$depinclist" >> "$2"
 	printf 'bmake_dist:\n' >> "$2"

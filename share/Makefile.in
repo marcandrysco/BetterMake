@@ -14,7 +14,7 @@ check: test
 
 test: bmake_test
 
-bmake_test:
+bmake_test: bmake_all
 
 dist: bmake_dist
 
