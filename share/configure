@@ -483,7 +483,7 @@ src_process()
 
 			"TestApplication")
 				printf '%s:%s\n' "$target" "$objlist" >> "$2"
-				printf '\t$(LD) $^ -o $@%s $(LDFLAGS)\n\n' "$ldflags" >> "$2"
+				printf '\t$(LD) $^%s $(LDFLAGS) -o $@\n\n' "$ldflags" >> "$2"
 				testlist="$testlist $target"
 				;;
 
@@ -501,7 +501,7 @@ src_process()
 					shortversion="${version%%.*}"
 					
 					printf 'lib%s.so.%s:%s\n' "$target" "$version" "$objlist" >> "$2"
-					printf '\t$(LD) $(LDFLAGS)%s -shared -Wl,-soname,lib%s.so.%s -o $@ $^\n' "$ldflags" "$target" "$shortversion" >> "$2"
+					printf '\t$(LD) $^ $(LDFLAGS)%s -shared -Wl,-soname,lib%s.so.%s -o $@\n' "$ldflags" "$target" "$shortversion" >> "$2"
 					printf '\tln -fs lib%s.so.%s lib%s.so.%s\n' "$target" "$version" "$target" "$shortversion" >> "$2"
 					printf '\tln -fs lib%s.so.%s lib%s.so\n\n' "$target" "$version" "$target" >> "$2"
 					targetlist="$targetlist `printf 'lib%s.so.%s' "$target" "$version"`"
