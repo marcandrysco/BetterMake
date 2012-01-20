@@ -14,7 +14,7 @@ check: test
 
 test: bmake_test
 
-bmake_test:
+bmake_test: bmake_all
 
 dist: bmake_dist
 
@@ -49,6 +49,5 @@ config.args:
 sources:
 
 dist:
-	if [ -z "$(PKGNAME)" ] ; then echo no package name given ; fi
 
 .PHONY: all clean maintainer-clean check test dist
