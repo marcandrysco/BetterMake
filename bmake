@@ -467,7 +467,7 @@ USAGE
 
 	if [ -z "$force" ] ; then 
 		fail=""
-		for file in "Makefile.in" "configure" "mktests/*"
+		for file in "Makefile.in" "configure" mktests/*
 		do
 			test -f "$file" || continue
 			chkfile "$file" && continue
@@ -482,7 +482,7 @@ USAGE
 	copyfile "Makefile.in"
 	copyfile "configure" 0755
 	test ! -d mktests && mkdir mktests
-	for file in "mktests/*"
+	for file in mktests/*
 	do
 		test -f "$file" || continue
 		copyfile "$file" 0755
