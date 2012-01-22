@@ -12,7 +12,7 @@ echo -n "checking -fvisiblity... "
 echo "int func() { return 0; }" > mktests/tmp.c
 test -f mktests/tmp.c || echo error || return 1
 
-$cc -c mktests/tmp.c -Wall -Werror -shared -fvisibility=internal -o mktests/tmp.out >> config.log 2>&1
+$cc $CFLAGS -c mktests/tmp.c -Wall -Werror -shared -fvisibility=internal -o mktests/tmp.out >> config.log 2>&1
 if [ $? -eq 0 ] && [ -f mktests/tmp.out ] ; then
 	echo yes ; visibility=yes
 else

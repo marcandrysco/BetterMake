@@ -29,4 +29,4 @@ else
 fi
 
 precc="$precc if [ ! -d \"\$(@D)/$depdir\" ] ; then mkdir \"\$(@D)/$depdir\" ; fi ; "
-CFLAGS="$CFLAGS -MD -MP -MF \$(@D)/$depdir/\$(@F).dep"
+cflags="$cflags -MD -MP -MF \$(@D)/$depdir/\$(@F).dep"
