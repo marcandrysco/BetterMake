@@ -510,6 +510,11 @@ cmd_test()
 		cmd_test_add "$@"
 		;;
 
+	remove)
+		#cmd_test_remove "$@"
+		echo "stub :(" >&2
+		;;
+
 	--help)
 		usage_test
 		exit
