@@ -17,7 +17,6 @@ test -f mktests/tmp.c || echo error || return 1
 
 $cc $CFLAGS mktests/tmp.c -o mktests/tmp.out >> config.log 2>&1
 if [ $? -eq 0 ] ; then
-	echo "#define restrict __restrict" >> "$config"
 	echo yes ; return 0
 fi
 echo no
