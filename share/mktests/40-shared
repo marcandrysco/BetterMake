@@ -25,7 +25,7 @@ else
 	echo "int testfunc() { return 0; }" > mktests/tmp.c
 	if [ ! -f mktests/tmp.c ] ; then echo error ; return 1 ; fi
 
-	$cc $CFLAGS $LDFLAGS mktests/tmp.c -Wall -Werror -shared -fpic -o mktests/tmp.out >> config.log 2>&1
+	$cc $cflags $ldflags mktests/tmp.c -Wall -Werror -shared -fpic -o mktests/tmp.out >> config.log 2>&1
 	if [ $? -eq 0 ] && [ -f mktests/tmp.out ] ; then
 		echo yes ; pic=yes
 	else

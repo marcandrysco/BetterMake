@@ -17,7 +17,7 @@ if ! test -f mktests/tmp.c ; then
 	return 1
 fi
 
-if ! $cc $CFLAGS mktests/tmp.c -o mktests/tmp.out ; then
+if ! $cc $cflags $ldflags mktests/tmp.c -o mktests/tmp.out ; then
 	echo "$__sanity_fail"
 	return 1
 fi

@@ -292,10 +292,6 @@ src_process()
 	distlist=""	# List of files to distribute
 	testlist=""	# List of test targets
 
-	# Store per-target flags
-	_cflags="$cflags $CFLAGS"
-	_ldflags="$ldflags $LDFLAGS"
-
 	tmpfile=tempfile
 	ifeval < "$1" > "$tmpfile"
 
@@ -320,7 +316,7 @@ src_process()
 			src_hasargs "$value" && src_err "Too many arguments passed to the 'Target' directive."
 			test "$target" && src_err "Target already defined as '$target'."
 			target="default"
-			cflags="$_cflags" ; reqcflags="" ; ldflags="$_ldflags" ; objlist="" ; prereq=""
+			cflags="" ; reqcflags="" ; ldflags="" ; objlist="" ; prereq="" ; installprefix=""
 			;;
 
 		"Name")
@@ -390,7 +386,7 @@ src_process()
 			"C")
 				printf '%s.o: %s%s%s\n' "${source%.*}" "$source" "$pch" "$prereq" >> "$2"
 				printf '\t$(bmake_PRECC)\n' >> "$2"
-				printf '\t$(CC) $(CFLAGS)%s%s -c $< -o $@\n\n' "$reqcflags" "$cflags" >> "$2"
+				printf '\t$(CC)%s%s $(CFLAGS) -c $< -o $@\n\n' "$reqcflags" "$cflags" >> "$2"
 				objlist="$objlist ${source%.*}.o"
 				cleanlist="$cleanlist ${source%.*}.o"
 				distlist="$distlist `quote "$source"`"
@@ -467,8 +463,14 @@ src_process()
 			src_hasargs "$value" && src_err "Too many arguments passed to the 'PCH' directive."
 			printf '%s.gch: %s%s\n' "$pch" "$pch" "$cdeps" >> "$2"
 			printf '\t$(bmake_PRECC)\n' >> "$2"
-			printf '\t$(CC) $(CFLAGS)%s -c $< -o $@\n\n' "$cflags" >> "$2"
+			printf '\t$(CC)%s%s $(CFLAGS) -c $< -o $@\n\n' "$reqflags" "$cflags" >> "$2"
 			pch=" $pch.gch"
+			;;
+
+		"InstallPrefix")
+			test -z "$target" && src_err "No target defined"
+			src_nextval value installprefix || src_err "Missing header file"
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'InstallPrefix' directive."
 			;;
 
 		"EndTarget")
@@ -481,7 +483,7 @@ src_process()
 				printf '\t$(LD) $^ -o $@%s $(LDFLAGS)\n\n' "$ldflags" >> "$2"
 				targetlist="$targetlist $target"
 				installdeps="$installdeps $target"
-				install="$install`printf '\n\tinstall --mode 0755 -D %s "%s/%s"' "$target" "$bindir" "$target"`"
+				install="$install`printf '\n\tinstall --mode 0755 -D %s "%s/%s%s"' "$target" "$bindir" "$installprefix" "$target"`"
 				cleanlist="$cleanlist $target"
 				;;
 
@@ -496,7 +498,7 @@ src_process()
 				printf '\t$(AR) $@ $^\n\n' >> "$2"
 				targetlist="$targetlist lib$target.a"
 				installdeps="$installdeps lib$target.a"
-				install="$install`printf '\n\tinstall --mode 0644 -D lib%s.a "%s/lib%s.a"' "$target" "$libdir" "$target"`"
+				install="$install`printf '\n\tinstall --mode 0644 -D lib%s.a "%s/%slib%s.a"' "$target" "$libdir" "$installprefix" "$target"`"
 				cleanlist="$cleanlist lib$target.a"
 
 				if [ "$dynlib" = "so" ] ; then
@@ -505,14 +507,14 @@ src_process()
 					shortversion="${version%%.*}"
 					
 					printf 'lib%s.so.%s:%s\n' "$target" "$version" "$objlist" >> "$2"
-					printf '\t$(LD) $^ $(LDFLAGS)%s -shared -Wl,-soname,lib%s.so.%s -o $@\n' "$ldflags" "$target" "$shortversion" >> "$2"
+					printf '\t$(LD)%s $^ $(LDFLAGS) -shared -Wl,-soname,lib%s.so.%s -o $@\n' "$ldflags" "$target" "$shortversion" >> "$2"
 					printf '\tln -fs lib%s.so.%s lib%s.so.%s\n' "$target" "$version" "$target" "$shortversion" >> "$2"
 					printf '\tln -fs lib%s.so.%s lib%s.so\n\n' "$target" "$version" "$target" >> "$2"
 					targetlist="$targetlist `printf 'lib%s.so.%s' "$target" "$version"`"
 					installdeps="$installdeps `printf 'lib%s.so.%s' "$target" "$version"`"
-					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.so.%s "%s/lib%s.so.%s"' "$target" "$version" "$libdir" "$target" "$version"`"
-					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so"' "$target" "$version" "$libdir" "$target"`"
-					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$target" "$shortversion"`"
+					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.so.%s "%s/%slib%s.so.%s"' "$target" "$version" "$libdir" "$installprefix" "$target" "$version"`"
+					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/%slib%s.so"' "$target" "$version" "$libdir" "$installprefix" "$target"`"
+					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/%slib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$installprefix" "$target" "$shortversion"`"
 					cleanlist="$cleanlist `printf 'lib%s.so.%s lib%s.so.%s lib%s.so' "$target" "$version" "$target" "$shortversion" "$target"`"
 				elif [ "$dynlib" = "dll" ] ; then
 					printf 'lib%s.dll:%s\n' "$target" "$objlist" >> "$2"
@@ -694,7 +696,7 @@ test ! -z $optname && echo "'$optname' requires parameter" && exit 1
 
 # Setup build flags
 cflags="$CFLAGS"
-ldflags="$CFLAGS"
+ldflags="$LDFLAGS"
 
 # Setup directories
 test -z "$prefix" && prefix="/usr/local"
