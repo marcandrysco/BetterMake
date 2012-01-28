@@ -480,7 +480,7 @@ src_process()
 			case "$type" in
 			"Application")
 				printf '%s:%s\n' "$target" "$objlist" >> "$2"
-				printf '\t$(LD) $^ -o $@%s $(LDFLAGS)\n\n' "$ldflags" >> "$2"
+				printf '\t$(LD) $^%s -o $@ $(LDFLAGS)\n\n' "$ldflags" >> "$2"
 				targetlist="$targetlist $target"
 				installdeps="$installdeps $target"
 				install="$install`printf '\n\tinstall --mode 0755 -D %s "%s/%s%s"' "$target" "$bindir" "$installprefix" "$target"`"
@@ -507,7 +507,7 @@ src_process()
 					shortversion="${version%%.*}"
 					
 					printf 'lib%s.so.%s:%s\n' "$target" "$version" "$objlist" >> "$2"
-					printf '\t$(LD)%s $^ $(LDFLAGS) -shared -Wl,-soname,lib%s.so.%s -o $@\n' "$ldflags" "$target" "$shortversion" >> "$2"
+					printf '\t$(LD) $^%s $(LDFLAGS) -shared -Wl,-soname,lib%s.so.%s -o $@\n' "$ldflags" "$target" "$shortversion" >> "$2"
 					printf '\tln -fs lib%s.so.%s lib%s.so.%s\n' "$target" "$version" "$target" "$shortversion" >> "$2"
 					printf '\tln -fs lib%s.so.%s lib%s.so\n\n' "$target" "$version" "$target" >> "$2"
 					targetlist="$targetlist `printf 'lib%s.so.%s' "$target" "$version"`"
