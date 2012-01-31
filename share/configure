@@ -521,8 +521,8 @@ src_process()
 					printf '\t$(LD) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s $(LDFLAGS)\n\n' "$target" "$ldflags" >> "$2"
 					targetlist="$targetlist `printf 'lib%s.dll' "$target"`"
 					installdeps="$installdeps `printf 'lib%s.dll' "$target"`"
-					install="$install`printf '\n\tinstall --mode 0644 -D lib%s.dll.a "%s/lib%s.dll.a"\n' "$target" "$libdir" "$target"`"
-					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.dll "%s/lib%s.dll"' "$target" "$bindir" "$target"`"
+					install="$install`printf '\n\tinstall --mode 0644 -D lib%s.dll.a "%s/%slib%s.dll.a"\n' "$target" "$libdir" "$installprefix" "$target"`"
+					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.dll "%s/%slib%s.dll"' "$target" "$bindir" "$installprefix" "$target"`"
 					cleanlist="$cleanlist `printf 'lib%s.dll lib%s.dll.a' "$target" "$target"`"
 				fi
 
