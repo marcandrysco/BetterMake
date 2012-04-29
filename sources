@@ -1,5 +1,5 @@
 Package	"bmake"
-Version	"0.8"
+Version	"0.99.1"
 
 Extra	"bmake"
 Extra	"share/configure"

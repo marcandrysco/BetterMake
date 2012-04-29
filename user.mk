@@ -1,11 +1,6 @@
 BIN = $(bmake_PATH_BIN)
 SHARE = $(bmake_PATH_SHARE)
 
-APPNAME = bmake
-VERSION = 0.1.1
-DISTNAME= $(APPNAME)-$(VERSION)
-
-
 all: user-all
 
 user-all:
