@@ -1,0 +1,10 @@
+%section%
+Basics
+
+This section of the tutorial will get you on your feet so that you can start
+using BetterMake right away. We will walk you through building your first
+project, common usage of the $bmake$ command, and managing the build process.
+
+%include:hello%
+
+%~section%

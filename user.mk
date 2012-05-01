@@ -20,8 +20,13 @@ user-install:
 	install --mode=0755 -D bmake $(BIN)/bmake
 	sed -i '/^sharedir=/ csharedir='\'"$(SHARE)/bmake"\' $(BIN)/bmake
 
+doc: doc-tut
+
+doc-tut:
+	cd doc/tut ; ./build 
+
 clean: user-clean
 
 user-clean:
 
-.PHONY: user-all user-install user-dist user-clean
+.PHONY: user-all user-install doc doc-tut user-clean

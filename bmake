@@ -368,37 +368,6 @@ targetcmd()
 	esac
 }
 
-testcmd()
-{
-	cmd=$1; shift;
-
-	case "$cmd" in
-	add)
-		test -z "$1" && echo "no tests to install" >&2 && exit 1
-
-		for name in "$@"
-		do
-			test ! -d mktests && echo "bmake build system not detected, aborting" >&2 && exit 1
-
-			match=""
-			for file in "$sharedir"/mktests/*
-			do
-				if [ "${file##*/[0-9][0-9]-}" = "$name" ] ; then
-					match="$file" ; break
-				fi
-			done
-
-			test -z "$match" && echo "No test '$name', aborting" >&2 && exit 1
-
-			cp "$file" mktests
-			echo "installed test '$name'"
-		done
-		;;
-	*)
-		usage 2 ; exit 1 ;;
-	esac
-}
-
 ##
 # cmd_install Function
 #   Processes an install command, copying the files into the target directory.
@@ -591,8 +560,8 @@ case "$cmd" in
 	update) cmd_update "$@" ;;
 	test) cmd_test "$@" ;;
 	
-	target | test )
-		"${cmd}cmd" "$@" ;;
+#target | test )
+#"${cmd}cmd" "$@" ;;
 	
 	help | -? | --help)
 		usage
