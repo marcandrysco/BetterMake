@@ -2,7 +2,7 @@ BIN = $(bmake_PATH_BIN)
 SHARE = $(bmake_PATH_SHARE)
 
 APPNAME = bmake
-VERSION = 0.1.1
+VERSION = 0.3.4
 DISTNAME= $(APPNAME)-$(VERSION)
 
 
@@ -27,7 +27,7 @@ user-dist:
 	mkdir $(DISTNAME)
 	mkdir $(DISTNAME)/share
 	mkdir $(DISTNAME)/share/mktests
-	cp Makefile bmake $(DISTNAME)
+	cp Makefile.in configure bmake $(DISTNAME)
 	cp share/mktests/[0-9][0-9]* $(DISTNAME)/share/mktests
 	cp share/Makefile.in share/configure $(DISTNAME)/share
 	tar -zcf $(DISTNAME).tar.gz $(DISTNAME)/

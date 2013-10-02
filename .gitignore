@@ -1,1 +1,7 @@
+# Editor files
 *.swp
+
+# Build files
+Makefile
+config.h
+config.status
