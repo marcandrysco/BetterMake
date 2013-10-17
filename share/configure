@@ -294,7 +294,7 @@ EOF
 	do
 		test ! -f "$script" && continue
 		rm -f mktests/tmp*
-		. $script || exit $?
+		. $script
 	done
 	rm -f mktests/tmp*
 
@@ -383,11 +383,11 @@ do
 		--disable-maintainer-mode | --disable-dependency-tracking)
 			echo "unsuppoted option '$optname'" ;;
 
-		CFLAGS | LDFLAGS )
+		cc | ld | CC | LD | CFLAGS | LDFLAGS )
 			test -z "$opt" && continue ; eval "$optname=`quote "$opt"`" ;;
 
 		*)
-			echo "invalid option $optname"
+			echo "invalid option '$optname'"
 			exit 1
 			;;
 	esac

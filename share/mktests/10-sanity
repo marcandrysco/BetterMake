@@ -17,14 +17,16 @@ if ! test -f mktests/tmp.c ; then
 	return 1
 fi
 
-if ! $cc mktests/tmp.c -o mktests/tmp.out ; then
-	echo "$__sanity_fail"
-	return 1
-fi
+if [ "%cc" ] ; then
+	if ! $cc mktests/tmp.c -o mktests/tmp.out ; then
+		echo "$__sanity_fail"
+		return 1
+	fi
 
-if [ ! -f mktests/tmp.out ] ; then
-	echo "$__sanity_fail"
-	return 1
+	if [ ! -f mktests/tmp.out ] ; then
+		echo "$__sanity_fail"
+		return 1
+	fi
 fi
 
 rm -f mktests/tmp*

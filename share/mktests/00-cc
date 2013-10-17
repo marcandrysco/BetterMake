@@ -13,20 +13,24 @@
 #     Adds flags for dependency tracking.
 #.
 
-echo -n "checking for compiler (${toolchain}gcc)... "
-if which "${toolchain}gcc" >/dev/null ; then
-	echo yes ; cc="${toolchain}gcc"
-else
-	echo no
+test "$cc" && echo "compiler specified ($cc)"
 
-	echo -n "checking for compiler (${toolchain}cc)... "
-	if which "${toolchain}gcc" >/dev/null ; then
-		echo yes ; cc="${toolchain}cc"
-	else
-		echo "error: no compiler found"
-		exit 1
-	fi
+if [ -z "$cc" ] && [ "$CC" ] ; then
+	echo -n "checking for compiler (${toolchain}$CC)... "
+	which "${toolchain}$CC" > /dev/null && { echo yes ; cc="${toolchain}$CC" ; } || echo no
 fi
+
+if [ -z "$cc" ] ; then
+	echo -n "checking for compiler (${toolchain}gcc)... "
+	which "${toolchain}gcc" > /dev/null && { echo yes ; cc="${toolchain}gcc" ; } || echo no
+fi
+
+if [ -z "$cc" ] ; then
+	echo -n "checking for compiler (${toolchain}cc)... "
+	which "${toolchain}cc" > /dev/null && { echo yes ; cc="${toolchain}cc" ; } || echo no
+fi
+
+test -z "$cc" && { echo "error: no compiler found" ; exit 1 ; }
 
 precc="$precc if [ ! -d \"\$(@D)/$depdir\" ] ; then mkdir \"\$(@D)/$depdir\" ; fi ; "
 CFLAGS="$CFLAGS -MD -MP -MF \$(@D)/$depdir/\$(@F).dep"

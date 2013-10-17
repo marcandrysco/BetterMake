@@ -8,17 +8,21 @@
 #     Set to the available linker.
 #.
 
-echo -n "checking for linker (${toolchain}gcc)... "
-if which "${toolchain}gcc" >/dev/null ; then
-	echo yes ; ld="${toolchain}gcc"
-else
-	echo no
+test "$ld" && echo "linker specified ($ld)"
 
-	echo -n "checking for linker (${toolchain}ld)... "
-	if which "${toolchain}gcc" >/dev/null ; then
-		echo yes ; ld="${toolchain}ld"
-	else
-		echo "error: no linker found"
-		exit 1
-	fi
+if [ -z "$ld" ] && [ "$LD" ] ; then
+	echo -n "checking for linker (${toolchain}$LD)... "
+	which "${toolchain}$LD" > /dev/null && { echo yes ; ld="${toolchain}$LD" ; } || echo no
 fi
+
+if [ -z "$ld" ] ; then
+	echo -n "checking for linker (${toolchain}gcc)... "
+	which "${toolchain}gcc" > /dev/null && { echo yes ; ld="${toolchain}gcc" ; } || echo no
+fi
+
+if [ -z "$ld" ] ; then
+	echo -n "checking for linker (${toolchain}ld)... "
+	which "${toolchain}ld" > /dev/null && { echo yes ; ld="${toolchain}ld" ; } || echo no
+fi
+
+test -z "$ld" && { echo "error: no linker found" ; exit 1 ; }
