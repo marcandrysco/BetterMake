@@ -573,7 +573,8 @@ EOF
 			test -f "$file" || break
 
 			if ! checkfile "$file" ; then
-				echo "'$file' has been modified, giving up on update" >&2
+				echo "File '$file' has been modified since last update. Giving up." >&2
+				echo "Use '--force' to overwrite the modified file." >&2
 				exit 1
 			fi
 			test "$verbose" && echo "~ ok file '$file'"

@@ -1,19 +1,54 @@
 #!/bin/sh
 
 ##
-# extract Function
-#   Given a chunk of a file, it extracts the quoted option value given the
-#   option name.
+# ltrim Function
+#   Trim all whitespace off of the front of the input string.
+# Version
+#   1.0
 # Parameters
-#   string text
-#     The input text to be parsed.
-#   string optname
-#     The name of the option to extract.
+#   string input
+#     The input string to be trimmed.
+# Printed
+#   The input string with the whitespace removed off of the front side.
 #.
 
-extract()
+ltrim()
 {
-	printf %s "$1" | sed -n 's/^\s*'"$2"'\s*"\(.*\)"\s*$/\1/p'
+	printf '%s' "${*#"${*%%[!`printf '\t\v\r\n '`]*}"}"
+}
+
+##
+# rtrim Function
+#   Trim all whitespace off of the end of the input string.
+# Version
+#   1.0
+# Parameters
+#   string input
+#     The input string to be trimmed.
+# Printed
+#   The input string with the whitespace removed off of the end.
+#.
+
+rtrim()
+{
+	printf '%s' "${*%"${*##*[!`printf '\t\v\r\n '`]}"}"
+}
+
+##
+# trim Function
+#   Trim all whitespace off of both the front and back of the input string.
+# Version
+#   1.0
+# Parameters
+#   string input
+#     The input string to be trimmed.
+# Printed
+#   The input string with the whitespace removed.
+#.
+
+trim()
+{
+	rtrim "`ltrim "$*"`"
 }
 
 ##
@@ -21,7 +56,7 @@ extract()
 #   Given the input string, it places it within single quotes, making sure that
 #   any single quotes within the string are properly escaped.
 # Version
-#   1.0
+#   1.1
 # Parameters
 #   string input
 #     The input text.
@@ -31,17 +66,49 @@ extract()
 
 quote()
 {
-	local str="$*"
+	__quote_str="$*"
+
+	if [ "${__quote_str#*[\'\"\\`printf '\t\v\r\n '`]}" = "$__quote_str" ] ; then
+		printf %s "$__quote_str"
+		return
+	fi
 
 	while [ 1 ]
 	do
-		local piece="${str%%\'*}"
-		test "$piece" = "$str" && break
-		printf "'%s'\\'" "$piece"
-		str="${str#*\'}"
+		__quote_piece="${__quote_str%%\'*}"
+		test "$__quote_piece" = "$__quote_str" && break
+		printf "'%s'\\'" "$__quote_piece"
+		__quote_str="${__quote_str#*\'}"
 	done
 
-	printf "'%s'" "$str"
+	printf %s "'$__quote_str'"
+}
+
+replace()
+{
+	printf '%s' "${1%%"$2"*}"
+
+	if [ -z "${1%%*"$2"*}" ] ; then
+		printf '%s' "$3"
+		replace "${1#*"$2"}" "$2" "$3"
+	fi
+}
+
+##
+# firstchar Function
+#   Used to process a string by returning the first character of a string.
+# Version
+#   1.0
+# Parameters
+#   string input
+#     The input string.
+# Printed
+#   A first character of the input string.
+#.
+
+firstchar()
+{
+	printf '^s' "${*%"${*#?}"}"
 }
 
 ##
@@ -64,7 +131,7 @@ ifeval()
 	__spaces="`printf ' \t\n'`"
 	__curval=''
 
-	printf '%s\n' "$*" | while read line
+	while read line
 	do
 		if [ "${line#If["$__spaces"]}" != "$line" ] ; then
 			__level=$(($__level + 1))
@@ -94,7 +161,6 @@ ifeval()
 		elif [ "${line#EndIf}" != "$line" ] ; then
 			test "$__curval" && test $__level -eq $__curval && __curval=''
 			__level=$(($__level - 1))
-			echo
 		else
 			if [ "$__curval" ] ; then
 				echo
@@ -106,7 +172,95 @@ ifeval()
 }
 
 ##
-# process_sources Function
+# src_hasargs Function
+#   Check that there are no more arguments passed in the given string.
+# Parameters
+#   string args
+#     The command arguments as a string.
+# Return Value
+#   Returns '0' if more arguments remain, '1' otherwise.
+#.
+
+src_hasargs()
+{
+	if [ "${value%%[`printf '\t\v\r\n '`]*}" ] ; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+##
+# src_nextval Function
+#   Retrieves the next quoted value from the input variable. The first argument
+#   in the value string is removed from the variable upon success completion of
+#   the function.
+# Parameters
+#   string var
+#     The name of the variable containing the value.
+#   string dest
+#     The name of the variable where the result will be stored.
+# Printed
+#   Prints the parsed value.
+#.
+
+src_nextval()
+{
+	eval '__tmp="$'$1'"'
+	__tmp_dest=""
+
+	case "$__tmp" in
+	\"*)
+		__tmp_val="${__tmp#\"*[!\\]\"}"
+
+		test "$__tmp_val" = "$__tmp" && return 1
+		__tmp="${__tmp%"$__tmp_val"}"
+		__tmp="${__tmp%\"}"
+		__tmp="${__tmp#\"}"
+
+		while true ; do
+			__tmp_dest="$__tmp_dest`printf %s "${__tmp%%\\\"*}"`"
+
+			test "${__tmp#*\\\"}" = "$__tmp" && break
+
+			__tmp="${__tmp#*\\\"}"
+			__tmp_dest="$__tmp_dest\\"
+		done
+
+		eval $1="`quote "$__tmp_val"`"
+		eval $2="`quote "$__tmp_dest"`"
+
+		;;
+	
+	*)
+		__tmp="${__tmp#"${__tmp%%[!`printf '\t\v\r\n '`]*}"}"
+		test "$__tmp" || return 1
+		;;
+	esac
+
+	return 0
+}
+
+##
+# src_err Function
+#   Produces an error message when parsing the sources file. The error
+#   message contains the filename, line number, and error message, and is
+#   written to the standard error stream. The script never returns from this
+#   function; instead, it directly exits with an error code of '1'.
+# Parameters
+#   string message
+#     The text error message to be printed.
+#.
+
+src_err()
+{
+	test -f "$tmpfile" && rm -f "$tmpfile"
+	echo "sources: $lineno: $*" >&2
+	exit 1
+}
+
+##
+# src_process Function
 #   Inputs the sources configuration file and produces the corresponding
 #   makefile.
 # Parameters
@@ -116,157 +270,297 @@ ifeval()
 #     The name of the output makefile.
 #.
 
-process_sources()
+src_process()
 {
 	test ! -f "$1" && return 1
-
-	remaining="`cat "$1"`"
-	remaining="`ifeval "$remaining"`"
-
 	rm -f "$2"
 
-	clean=""	# Cleaning commands
-	objlist=""	# List of all object files
+	package="package"	# Package name
+	pkgver=""	# Package version
+	lineno=0	# Line number
+	target=""	# Current target
+	type=""		# Target type
+	objlist=""	# List of object for the current target
+	targetlist=""	# List of targets to be built
 	depdirlist=""	# List of dependency directories
 	depinclist=""	# List of dependency paths to include
 	installdeps=""	# Dependencies for installation
 	install=""	# Commands for installation
-	clean=""	# Rules for cleaning
+	clean=""	# Commands for cleaning
+	cleanlist=""	# Files to be cleaned
+	pch=""		# Precompile header dependency
+	distlist=""	# List of files to distribute
+	testlist=""	# List of test targets
 
-	while [ 1 ]
+	tmpfile=tempfile
+	ifeval < "$1" > "$tmpfile"
+
+	while read -r line
 	do
-		local copy="`printf %s "$remaining" | sed '/^\s*EndTarget\s*$/,$d'`"
-		test "$copy" = "$remaining" && break
+		lineno=$((lineno + 1))
 
-		cdeps="";				# C Dependencies
-		targetdeps=""				# Target Dependencies
-		cflags=" `extract "$copy" CFlags`"	# C Flags
-		ldflags=" `extract "$copy" LDFlags`"	# Linker Flags
+		line="`trim "$line"`"
+		test -z "$line" && continue
 
-		local target="`extract "$copy" Name`"
-		local type="`extract "$copy" Type`"
-		local local="`extract "$copy" Local`"
-		local version="`extract "$copy" Version`"
-		local sources="`extract "$copy" Source`"
-		local obj="`printf %s "$sources" | sed 's/.c\(pp\)\?$/.o/'`"
-		obj="`echo -n $obj`"
+		command="${line%%[`printf '\t\v\r\n '`]*}"
+		value="`trim "${line#"$command"}"`"
 
-		test -z "$version" && version="0.0.0"
-		local shortversion="${version%%.*}"
+		case "$command" in
+		"Package")
+			test "$target" && src_err "'Package' directive not allowed inside the 'Target' directive."
+			src_nextval value package || src_err "Missing argument for the 'Package' directive."
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'Package' directive."
+			;;
 
-		case "$local" in
-			[Tt][Rr][Uu][Ee] | [Yy][Ee][Ss] )
-				prefix="$HOME"
-				bindir="$HOME/bin"
-				libdir="$HOME/bin"
-				sharedir="$HOME/bin"
-				cflags="$cflags -I\"$HOME/include\""
-				ldflags="$ldflags -L\"$HOME/lib\" -Wl,-rpath=\"$HOME/lib\""
+		"Target")
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'Target' directive."
+			test "$target" && src_err "Target already defined as '$target'."
+			target="default"
+			cflags="" ; reqcflags="" ; ldflags="" ; objlist="" ; prereq="" ; installprefix=""
+			;;
+
+		"Name")
+			test -z "$target" && src_err "No target defined"
+			src_nextval value target || src_err "Invalid parameter"
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'Name' directive."
+			;;
+
+		"Type")
+			test -z "$target" && src_err "No target defined"
+			src_nextval value type || src_err "Invalid parameter"
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'Type' directive."
+
+			case "$type" in
+			"Application")
 				;;
 
-			[Ff][Aa][Ll][Ss][Ee] | [Nn][Oo] | "")
+			"TestApplication")
+				;;
+
+ 			"Library")
+				test "$pic" && reqcflags="$reqcflags -fpic"
 				;;
 
 			*)
-				echo "invalid local value \"$local\"" >&2
-				exit 1
-		esac
+				src_err "Invalid target type '$type'"
+			esac
 
-		# Precompiled header handling
-		pch="`extract "$copy" PCH`"
-		if [ -n "$pch" ] ; then
+			;;
+
+		"Version")
+			if [ "$target" ] ; then
+				test "$version" && src_err "Target version already defined"
+				src_nextval value version || src_err "Invalid parameter"
+				src_hasargs "$value" && src_err "Too many arguments passed to the 'Version' directive."
+			else
+				test "$pkgver" && src_err "Package version already defined"
+				src_nextval value pkgver || src_err "Invalid parameter"
+				src_hasargs "$value" && src_err "Too many arguments passed to the 'Version' directive."
+			fi
+			;;
+
+		"Source")
+			test -z "$target" && src_err "No target defined"
+			src_nextval value source || src_err "Missing source file"
+			src_nextval value filetype || {
+				case $source in
+				*.c)
+					filetype="C,H"
+					;;
+
+				*)
+					src_err "Unknown file extension '.${source##*.}'"
+				esac
+			}
+			src_hasargs "$value" && src_err "Too many arguments passed to the '$command' directive."
+
+			if [ -z "${filetype%%*,H}" ] ; then
+				filetype="${filetype%,H}"
+				if [ -e "${source%.*}.h" ] ; then
+					header="${source%.*}.h"
+					distlist="$distlist `quote "$header"`"
+				fi
+			fi
+
+			case "$filetype" in
+			"C")
+				printf '%s.o: %s%s%s\n' "${source%.*}" "$source" "$pch" "$prereq" >> "$2"
+				printf '\t$(bmake_PRECC)\n' >> "$2"
+				printf '\t$(CC)%s%s $(CFLAGS) -c $< -o $@\n\n' "$reqcflags" "$cflags" >> "$2"
+				objlist="$objlist ${source%.*}.o"
+				cleanlist="$cleanlist ${source%.*}.o"
+				distlist="$distlist `quote "$source"`"
+
+				dir="${source%/*}"
+				test "$dir" = "$source" && dir="."
+
+				if [ -z "$depinclist" ] ; then
+					depinclist="$depinclist $dir/.deps/*"
+				elif [ "${depinclist%*" $dir/.deps "*}" ] && [ "${depinclist%*" $dir/.deps"}" ] ; then
+					depinclist="$depinclist $dir/.deps/*"
+				fi
+
+				;;
+
+			*)
+				src_err "Unknown filetype '$filetype'"
+			esac
+
+			;;
+		
+		"Extra")
+			while src_nextval value tmpval
+			do
+				distlist="$distlist `quote "$tmpval"`"
+			done
+			;;
+		
+		"CFlags")
+			test -z "$target" && src_err "No target defined"
+			if [ ! "${value%%+*}" ] ; then
+				value="${value#+}"
+			else
+				cflags=""
+			fi
+
+			while src_nextval value tmpval
+			do
+				cflags="$cflags $tmpval"
+			done
+			;;
+		
+		"LDFlags")
+			test -z "$target" && src_err "No target defined"
+			if [ ! "${value%%+*}" ] ; then
+				value="${value#+}"
+			else
+				ldflags=""
+			fi
+
+			while src_nextval value tmpval
+			do
+				ldflags="$ldflags $tmpval"
+			done
+			;;
+		
+		"PreReq")
+			test -z "$target" && src_err "No target defined"
+			if [ ! "${value%%+*}" ] ; then
+				value="${value#+}"
+			else
+				prereq=""
+			fi
+
+			while src_nextval value tmpval
+			do
+				prereq="$prereq $tmpval"
+			done
+			;;
+		
+		"PCH")
+			test -z "$target" && src_err "No target defined"
+			src_nextval value pch || src_err "Missing header file"
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'PCH' directive."
 			printf '%s.gch: %s%s\n' "$pch" "$pch" "$cdeps" >> "$2"
 			printf '\t$(bmake_PRECC)\n' >> "$2"
-			printf '\t$(CC) $(CFLAGS)%s -c $< -o $@\n\n' "$cflags" >> "$2"
+			printf '\t$(CC)%s%s $(CFLAGS) -c $< -o $@\n\n' "$reqflags" "$cflags" >> "$2"
+			pch=" $pch.gch"
+			;;
 
-			clean="$clean`printf '\n\trm -f %s.gch\n' "$pch"`"
-			cdeps="$cdeps $pch.gch"
-		fi
+		"InstallPrefix")
+			test -z "$target" && src_err "No target defined"
+			src_nextval value installprefix || src_err "Missing header file"
+			src_hasargs "$value" && src_err "Too many arguments passed to the 'InstallPrefix' directive."
+			;;
 
-		case "$type" in
-			# Build an executable application
-			"Application" | "" )
-				printf 'bmake_all: %s\n\n' "$target" >> "$2"
-				printf '%s: %s%s\n' "$target" "$obj" "$targetdeps" >> "$2"
-				printf '\t%s\n\n' "`printf '$(LD) $^ -o $@ $(LDFLAGS)%s\n' "$ldflags"`" >> "$2"
+		"EndTarget")
+			test -z "$target" && src_err "No target defined"
+			test -z "$type" && type="Application"
+
+			case "$type" in
+			"Application")
+				printf '%s:%s\n' "$target" "$objlist" >> "$2"
+				printf '\t$(LD) $^%s -o $@ $(LDFLAGS)\n\n' "$ldflags" >> "$2"
+				targetlist="$targetlist $target"
 				installdeps="$installdeps $target"
-				install="$install`printf '\n\tinstall --mode 0755 -D %s "%s/%s"\n' "$target" "$bindir" "$target"`"
-				clean="$clean`printf '\n\trm -f %s\n' "$target"`"
-				local ldextra=''
+				install="$install`printf '\n\tinstall --mode 0755 -D %s "%s/%s%s"' "$target" "$bindir" "$installprefix" "$target"`"
+				cleanlist="$cleanlist $target"
 				;;
 
-			# Build a test application meant to be run during a make check
 			"TestApplication")
-				printf 'bmake_test: %s_test\n\n' "$target" >> "$2"
-				printf '%s_test: %s\n' "$target" "$target" >> "$2"
-				printf '\t@./%s || echo "**** %s failed ****"\n\n' "$target" "$target" >> "$2"
-				printf '%s: %s %s| all\n' "$target" "$obj" "$deps">> "$2"
-				printf '\t%s\n\n' "`printf '$(LD) %s -o $@%s $(LDFLAGS)\n' "$obj" "$ldflags"`" >> "$2"
-				clean="$clean`printf '\n\trm -f %s\n' "$target"`"
-				local ldextra=''
+				printf '%s:%s\n' "$target" "$objlist" >> "$2"
+				printf '\t$(LD) $^%s $(LDFLAGS) -o $@\n\n' "$ldflags" >> "$2"
+				testlist="$testlist $target"
 				;;
 
-			# Build a static and (optionally) a shared library
 			"Library")
-				printf 'bmake_all: lib%s.a\n\n' "$target" >> "$2"
-				printf 'lib%s.a: %s\n\t%s\n\n' "$target" "$obj" "`printf '%sar rcs $@ $^' "$toolchain"`" >> "$2"
+				printf 'lib%s.a:%s\n' "$target" "$objlist" >> "$2"
+				printf '\t$(AR) $@ $^\n\n' >> "$2"
+				targetlist="$targetlist lib$target.a"
 				installdeps="$installdeps lib$target.a"
-				install="$install`printf '\n\tinstall --mode 0644 -D lib%s.a "%s/lib%s.a"' "$target" "$libdir" "$target"`"
-				clean="$clean`printf '\n\trm -f lib%s.a' "$target"`"
+				install="$install`printf '\n\tinstall --mode 0644 -D lib%s.a "%s/%slib%s.a"' "$target" "$libdir" "$installprefix" "$target"`"
+				cleanlist="$cleanlist lib$target.a"
+
 				if [ "$dynlib" = "so" ] ; then
-					printf 'bmake_all: lib%s.so.%s\n\n' "$target" "$version" >> "$2"
-					printf 'lib%s.so.%s: %s\n' "$target" "$version" "$obj" >> "$2"
-					printf '\t$(LD) $(LDFLAGS) -shared -Wl,-soname,lib%s.so.%s -o $@ $^%s\n' "$target" "$shortversion" "$ldflags" >> "$2"
+					test -z "$version" && version="$pkgver"
+					test -z "$version" && version="0.0.1"
+					shortversion="${version%%.*}"
+					
+					printf 'lib%s.so.%s:%s\n' "$target" "$version" "$objlist" >> "$2"
+					printf '\t$(LD) $^%s $(LDFLAGS) -shared -Wl,-soname,lib%s.so.%s -o $@\n' "$ldflags" "$target" "$shortversion" >> "$2"
 					printf '\tln -fs lib%s.so.%s lib%s.so.%s\n' "$target" "$version" "$target" "$shortversion" >> "$2"
 					printf '\tln -fs lib%s.so.%s lib%s.so\n\n' "$target" "$version" "$target" >> "$2"
-					cflags="$cflags -fpic"
+					targetlist="$targetlist `printf 'lib%s.so.%s' "$target" "$version"`"
 					installdeps="$installdeps `printf 'lib%s.so.%s' "$target" "$version"`"
-					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.so.%s "%s/lib%s.so.%s"' "$target" "$version" "$libdir" "$target" "$version"`"
-					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so"' "$target" "$version" "$libdir" "$target"`"
-					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/lib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$target" "$shortversion"`"
-					clean="$clean`printf '\n\trm -rf lib%s.so.%s lib%s.so.%s lib%s.so' "$target" "$version" "$target" "$shortversion" "$target"`"
+					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.so.%s "%s/%slib%s.so.%s"' "$target" "$version" "$libdir" "$installprefix" "$target" "$version"`"
+					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/%slib%s.so"' "$target" "$version" "$libdir" "$installprefix" "$target"`"
+					install="$install`printf '\n\tln -fs lib%s.so.%s "%s/%slib%s.so.%s"\n\n' "$target" "$version" "$libdir" "$installprefix" "$target" "$shortversion"`"
+					cleanlist="$cleanlist `printf 'lib%s.so.%s lib%s.so.%s lib%s.so' "$target" "$version" "$target" "$shortversion" "$target"`"
 				elif [ "$dynlib" = "dll" ] ; then
-					printf 'bmake_all: lib%s.dll\n\n' "$target" >> "$2"
-					printf 'lib%s.dll: %s\n' "$target" "$obj" >> "$2"
-					printf '\t$(LD) $(LDFLAGS) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s\n' "$target" "$ldflags" >> "$2"
+					printf 'lib%s.dll:%s\n' "$target" "$objlist" >> "$2"
+					printf '\t$(LD) -shared -Wl,--out-implib,lib%s.dll.a -Wl,--enable-auto-import -o $@ $^%s $(LDFLAGS)\n\n' "$target" "$ldflags" >> "$2"
+					targetlist="$targetlist `printf 'lib%s.dll' "$target"`"
 					installdeps="$installdeps `printf 'lib%s.dll' "$target"`"
 					install="$install`printf '\n\tinstall --mode 0644 -D lib%s.dll.a "%s/lib%s.dll.a"\n' "$target" "$libdir" "$target"`"
 					install="$install`printf '\n\tinstall --mode 0755 -D lib%s.dll "%s/lib%s.dll"' "$target" "$bindir" "$target"`"
-					clean="$clean`printf '\n\trm -rf lib%s.dll lib%s.dll.a' "$target" "$target"`"
+					cleanlist="$cleanlist `printf 'lib%s.dll lib%s.dll.a' "$target" "$target"`"
 				fi
+
 				;;
-
 			*)
-				echo "invalid target type" >&2 ; exit 1 ;;
+				src_err "Invalid target type '$type'"
+				;;
+			esac
+
+			target=""
+			;;
+
+		*)
+			src_err "Unhandled directive '$command'"
+			echo "$command"
+			;;
 		esac
+	done < "$tmpfile"
 
-		for file in $sources
-		do
-			objfile="`printf %s "$file" | sed 's/.c\(pp\)\?$/.o/'`"
-			objlist="$objlist $objfile"
+	rm -f "$tmpfile"
+	test "$target" && src_err "Unterminated 'Target' directive'"
 
-			printf '%s: %s%s\n' "$objfile" "$file" "$cdeps" >> "$2"
-			printf '\t$(bmake_PRECC)\n' >> "$2"
-			printf '\t$(CC)%s -c $< -o $@ $(CFLAGS)\n\n' "$cflags" >> "$2"
+	pkgname="`quote "$package"`"
+	test "$pkgver" && pkgname="$pkgname-`quote "$pkgver"`"
 
-			# Add depdir if not in list
-			fulldepdir="${file%/*}/$depdir"
-			if [ "${depdirlist%" $fulldepdir"}" = "$depdirlist" ] ; then
-				depdirlist="$depdirlist $fulldepdir"
-				depinclist="$depinclist $fulldepdir/*"
-			fi
-		done
-
-		remaining=`printf %s "$remaining" | sed '1,/^\s*EndTarget\s*$/d'`
-	done
-
-	test "$objlist" && clean="$clean`printf '\n\trm -f%s' "${objlist% }"`"
-	test "$depdirlist" && clean="$clean`printf '\n\trm -rf%s' "${depdirlist% }"`"
-
+	printf 'bmake_all:%s\n\n' "$targetlist" >> "$2"
+	printf 'bmake_test:%s\n\n' "$testlist" >> "$2"
 	printf 'bmake_install:%s%s\n\n' "$installdeps" "$install" >> "$2"
-	printf 'bmake_clean:%s\n\n' "$clean" >> "$2"
+	printf 'bmake_clean:%s\n\trm -rf config.status config.log%s%s\n\n' "$clean" "$cleanlist" "$depinclist" >> "$2"
+	printf 'bmake_dist:\n' >> "$2"
+	printf '\tif [ -e %s ] ; then rm -rf %s ; fi ; mkdir %s\n' "$pkgname" "$pkgname" "$pkgname" >> "$2"
+	printf '\tcp --parents configure Makefile.in $(wildcard mktests/* sources user.mk)%s %s\n' "$distlist" "$pkgname" >> "$2"
+	printf '\ttar -zcf %s.tar.gz %s/\n' "$pkgname" "$pkgname" >> "$2"
+	printf '\trm -rf %s\n\n' "$pkgname" >> "$2"
 	printf 'sinclude%s\n\n' "$depinclist" >> "$2"
+	#printf 'dist:\n\ttar -zcf pack.tar.gz configure Makefile.in\n\n'
 	printf '.PNOHY: bmake_install bmake_clean\n' >> "$2"
+
 }
 
 ##
@@ -284,6 +578,7 @@ exec_tests()
 #define BMAKE__PATH_PREFIX	"$prefix"
 #define BMAKE__PATH_BIN		"$bindir"
 #define BMAKE__PATH_LIB		"$libdir"
+#define BMAKE__PATH_INCLUDE	"$includedir"
 #define BMAKE__PATH_SHARE	"$sharedir"
 #define BMAKE__PATH_CONF	"$confdir"
 
@@ -311,12 +606,14 @@ EOF
 	echo "bmake_PATH_PREFIX = $prefix" >> Makefile
 	echo "bmake_PATH_BIN = $bindir" >> Makefile
 	echo "bmake_PATH_LIB = $libdir" >> Makefile
+	echo "bmake_PATH_INCLUDE = $includedir" >> Makefile
 	echo "bmake_PATH_SHARE = $sharedir" >> Makefile
 	echo "bmake_PATH_CONF = $confdir" >> Makefile
 
 	echo "#endif" >> "$config"			# End of config.h generation
 	echo "# end autogenerated content" >> Makefile	# End of Makefile generation
-	cat "Makefile.in" >> "Makefile"			# Append Makefile.in
+
+	test -f "Makefile.in" && cat "Makefile.in" >> "Makefile"	# Append Makefile.in
 }
 
 ##
@@ -374,10 +671,10 @@ do
 		--host)
 			test -z "$opt" && continue ; host="$opt" ;;
 
-		--toolchain | --prefix | --libdir | --bindir | --confdir | --depdir)
+		--toolchain | --prefix | --libdir | --bindir | --includedir | --confdir | --depdir)
 			test -z "$opt" && continue ; eval "${optname#--}=`quote "$opt"`" ;;
 
-		--includedir | --mandir | --infodir | --sysconfdir | --localstatedir | --libexecdir)
+		--infodir | --sysconfdir | --localstatedir | --libexedir)
 			echo "option '$optname' not supported yet" ;;
 
 		--disable-maintainer-mode | --disable-dependency-tracking)
@@ -387,7 +684,7 @@ do
 			test -z "$opt" && continue ; eval "$optname=`quote "$opt"`" ;;
 
 		*)
-			echo "invalid option '$optname'"
+			echo "invalid option $optname"
 			exit 1
 			;;
 	esac
@@ -397,10 +694,15 @@ done
 
 test ! -z $optname && echo "'$optname' requires parameter" && exit 1
 
+# Setup build flags
+cflags="$CFLAGS"
+ldflags="$LDFLAGS"
+
 # Setup directories
 test -z "$prefix" && prefix="/usr/local"
 test -z "$bindir" && bindir="$prefix/bin"
 test -z "$libdir" && libdir="$prefix/lib"
+test -z "$includedir" && includedir="$prefix/include"
 test -z "$sharedir" && sharedir="$prefix/share"
 test -z "$confdir" && confdir="$prefix/etc"
 test -z "$depdir" && depdir=".deps"
@@ -408,9 +710,9 @@ test -z "$depdir" && depdir=".deps"
 # Normalize parameters
 test "$toolchain" && toolchain="$toolchain-"
 
-exec_tests				# Execute tests, building config.h and Makefile
-process_sources sources sources.mk	# Process sources to build sources.mk
-build_config_status "$@"		# Build config.status file
+exec_tests			# Execute tests, building config.h and Makefile
+src_process sources sources.mk	# Process sources to build sources.mk
+build_config_status "$@"	# Build config.status file
 
 # Update all the files that configure depends on, Makefile always last
 test -f sources && touch sources
