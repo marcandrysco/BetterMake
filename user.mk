@@ -20,7 +20,8 @@ user-install:
 	install --mode=0755 -D bmake $(BIN)/bmake
 	sed -i '/^sharedir=/ csharedir='\'"$(SHARE)/bmake"\' $(BIN)/bmake
 
-dist: user-dist
+doc: doc-tut
+
 
 user-dist:
 	if [ -e $(DISTNAME) ] ; then rm -rf $(DISTNAME) ; fi
@@ -34,10 +35,12 @@ user-dist:
 	tar -jcf $(DISTNAME).tar.bz2 $(DISTNAME)/
 	rm -rf $(DISTNAME)
 
+doc-tut:
+	cd doc/tut ; ./build 
+
+
 clean: user-clean
 
 user-clean:
-	rm -f $(DISTNAME).tar.gz $(DISTNAME).tar.bz2
 
-.PHONY: user-all user-install user-dist user-clean
-
+.PHONY: user-all user-install doc doc-tut user-clean

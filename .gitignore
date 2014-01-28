@@ -3,5 +3,8 @@
 
 # Build files
 Makefile
+sources.mk
 config.h
+config.args
 config.status
+config.log

@@ -55,6 +55,32 @@ EOF
 }
 
 ##
+# usage_test Function
+#   Displays the usage information regarding the list of possible test commands.
+# Parameters
+#   int fd = 1
+#     Optional. The file descriptor number to send it to, often set to '2' for
+#     error out.
+#.
+
+usage_test()
+{
+	if [ "$#" -eq 0 ] ; then
+		fd=1
+	else
+		fd=$1
+	fi
+
+	cat <<USAGE >&$fd
+bmake test <command> [options]
+
+Possible test commands are:
+  add
+  delete
+USAGE
+}
+
+##
 # getopt_long Function
 #   Parses a list of options, retrieving all of the values and flags. The
 #   returned data is valid POSIX shell code that should be evaluated in order
@@ -287,6 +313,40 @@ checkfile()
 	test "$md5" = "$chk"
 }
 
+##
+# chkfile Function
+#   Checks a file to verify that it has not been changed since the last bmake
+#   install or update by verifying the MD5 checksum.
+# Parameters
+#   string path
+#     The path to the file to be checked.
+# Return Value
+#   Returns '0' if the checksums match, non-zero if they do not match.
+#.
+
+chkfile()
+{
+	orig="`cat "$1" | sed -n '3p' | sed -n 's/^.*md5sum: \([0-9a-fA-F]*\).*$/\1/p'`"
+	chk="`cat "$1" | sed '2,4d' | md5sum | head -c32`"
+
+	if [ "$orig" = "$chk" ] ; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+##
+# quotify Function
+#   Takes an input string and escapes all double quotes so that the output
+#   string is useable inside double-quotes.
+# Version
+#   1.0
+# Parameters
+#   string input
+#     The input text.
+#.
+
 quotify()
 {
 	echo "$1" | sed 's/"/\\"/g'
@@ -434,34 +494,132 @@ targetcmd()
 	esac
 }
 
-testcmd()
-{
-	cmd=$1; shift;
+##
+# cmd_install Function
+#   Processes an install command, copying the files into the target directory.
+#   A force install will automatically overwrite any current files.
+# Parameters
+#   string params
+#     The set of parameters to the command, generally '$@'.
+#.
 
+cmd_install()
+{
+	help="" ; force=""
+	eval `getopt_long f? f,force ?,help -- "$@"`
+	if [ -n "$err" ] ; then echo "$err" ; exit 1 ; fi
+
+	if [ "$help" ] ; then
+		cat <<USAGE
+usage: bmake install [-f | --force]
+Options
+  -f, --force   Forces all files to be installed overwriting existing files
+      --help    Produce this help message
+USAGE
+		exit 0
+	fi
+
+	if [ -z "$force" ] ; then 
+		for file in "Makefile.in" "configure"
+		do
+			test -e "$file" || continue
+
+			echo "$file already exists, cowardly giving up" >&2
+			exit 1
+		done
+	fi
+
+	copyfile "Makefile.in"
+	copyfile "configure" 0755
+	test ! -d mktests && mkdir mktests
+}
+
+##
+# cmd_update Function
+#   Updates the currently existing build files, replacing old files with the
+#   new versions. Without the '--force' option, if any of the previous files
+#   were modified, then the update will abort and an error will be reported.
+# Parameters
+#   string params
+#     The set of parameters to the command, generally '$@'.
+#.
+
+cmd_update()
+{
+	help="" ; force=""
+	eval `getopt_long f? f,force ?,help -- "$@"`
+	if [ -n "$err" ] ; then echo "$err" ; exit 1 ; fi
+
+	if [ "$help" ] ; then
+		cat <<USAGE
+usage: bmake update [-f | --force]
+Options
+  -f, --force   Forces all files to be updated, overwriting existing files
+      --help    Produce this help message
+USAGE
+		exit 0
+	fi
+
+	if [ -z "$force" ] ; then 
+		fail=""
+		for file in "Makefile.in" "configure" mktests/*
+		do
+			test -f "$file" || continue
+			chkfile "$file" && continue
+
+			echo "error: $file has been modified since the last install or update" >&2
+			fail=1
+		done
+
+		test "$fail" && exit 1
+	fi
+
+	copyfile "Makefile.in"
+	copyfile "configure" 0755
+	test ! -d mktests && mkdir mktests
+	for file in mktests/*
+	do
+		test -f "$file" || continue
+		copyfile "$file" 0755
+	done
+}
+
+##
+# cmd_test Function
+#   Determine the desired test command, producing an error on invalid input.
+# Parameters
+#   string params
+#     The set of parameters to the command, generally '$@'.
+#.
+
+cmd_test()
+{
+	if [ "$#" -eq 0 ] ; then
+		usage_test
+		exit
+	fi
+
+	cmd="$1" ; shift
 	case "$cmd" in
 	add)
-		test -z "$1" && echo "no tests to install" >&2 && exit 1
-
-		for name in "$@"
-		do
-			test ! -d mktests && echo "bmake build system not detected, aborting" >&2 && exit 1
-
-			match=""
-			for file in "$sharedir"/mktests/*
-			do
-				if [ "${file##*/[0-9][0-9]-}" = "$name" ] ; then
-					match="$file" ; break
-				fi
-			done
-
-			test -z "$match" && echo "No test '$name', aborting" >&2 && exit 1
-
-			cp "$file" mktests
-			echo "installed test '$name'"
-		done
+		cmd_test_add "$@"
 		;;
+
+	remove)
+		#cmd_test_remove "$@"
+		echo "stub :(" >&2
+		;;
+
+	--help)
+		usage_test
+		exit
+		;;
+
 	*)
-		usage 2 ; exit 1 ;;
+		echo "invalid command 'test $cmd'" >&2
+		echo >&2
+		usage_test 2
+		exit 1
 	esac
 }
 
@@ -519,7 +677,7 @@ Possible options are:
   -b,--bare   Produce a bare BetterMake environment, installing no tests
   -f,--force  Force a new installation even if a previous install is detcted
 EOF
-		return
+		return 0
 	fi
 
 	if [ -z "$force" ] ; then
@@ -539,7 +697,9 @@ EOF
 	if [ -z "$bare" ] ; then
 		for file in "mktests/00-cc" "mktests/00-ld"
 		do
-			copyfile "$file" 0755
+			if [ "${file##*/[0-9][0-9]-}" = "$name" ] ; then
+				match="${file#"$sharedir/"}" ; break
+			fi
 		done
 	fi
 }

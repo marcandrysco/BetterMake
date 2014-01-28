@@ -1,0 +1,44 @@
+%subsect%
+Hello World!
+
+%detail%
+Setup
+
+Create a new directory to house the application. To start, create the build
+environment using the command $bmake install$, which will create the
+$configure$ and $Makefile.in$ files and create the $mktests$ directory. Like
+other build systems, the $configure$ script is used to build the $Makefile$
+and any other required files.
+
+Additionally, you will want to run the command $bmake test add sanity cc ld$,
+which will execute tests of checking the sanity of the build envionrment, and
+detecting your compiler and linker. These will be covered in more detail
+later.
+
+With the build environment created, you can create a $sources$ files that
+instructs the system how to build your project and which files to compile.
+Below is the $sources$ file for our basic $Hello World!$ application.
+
+%code%
+Target
+	Name	"hello"
+	Source	"code.c"
+EndTarget
+%~code%
+
+All that is left is writing the C code. The below code should be appropriate.
+
+%code%
+#include <stdio.h>
+
+int main()
+{
+	printf("Hello World!\n");
+
+	return 0;
+}
+%~code%
+
+%~detail%
+
+%~subsect%
