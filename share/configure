@@ -582,6 +582,9 @@ exec_tests()
 #define BMAKE__PATH_SHARE	"$sharedir"
 #define BMAKE__PATH_CONF	"$confdir"
 
+#define BMAKE__HOST		"$host"
+#define BMAKE__HOST_$host	1
+
 EOF
 
 	# Run through all the scripts
@@ -596,11 +599,12 @@ EOF
 	# Optional variables
 	test "$cc" && echo "bmake_CC = $cc" >> Makefile			# C compiler
 	test "$precc" && echo "bmake_PRECC = @$precc" >> Makefile	# Before c compilation commands
-	test "$ld" && echo "bmake_LD = $ld" >> Makefile			# Linkder
+	test "$ld" && echo "bmake_LD = $ld" >> Makefile			# Linker
 
 	# Mandatory variables
 	echo "bmake_CFLAGS = $CFLAGS" >> Makefile	# C compiler flags
 	echo "bmake_LDFLAGS = $LDFLAGS" >> Makefile	# Linker flags
+	echo "bmake_HOST = $host" >> Makefile		# Target host
 
 	# Path variables
 	echo "bmake_PATH_PREFIX = $prefix" >> Makefile

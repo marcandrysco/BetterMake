@@ -232,6 +232,8 @@ copyfile()
 {
 	local src="$sharedir/$1"
 
+	test ! -f "$src" && return 1
+
 	rm -f "$1"
 
 	if isscript "$src" ; then head -n 1 "$src" >> "$1" ; fi
@@ -247,6 +249,7 @@ copyfile()
 	fi
 
 	test ! -z "$2" && chmod "$2" "$1"
+	return 0
 }
 
 ##
@@ -571,6 +574,7 @@ EOF
 		for file in configure Makefile.in mktests/[0-9][0-9]-*
 		do
 			test -f "$file" || break
+			test ! -f "$sharedir/$file" && continue
 
 			if ! checkfile "$file" ; then
 				echo "File '$file' has been modified since last update. Giving up." >&2
@@ -591,7 +595,7 @@ EOF
 	do
 		test -f "$file" || break
 
-		copyfile "$file" 0755
+		copyfile "$file" 0755 || continue
 		test "$verbose" && echo "~ copied file '$file'"
 	done
 }
