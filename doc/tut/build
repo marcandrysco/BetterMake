@@ -1,4 +1,0 @@
-#!/bin/sh
-
-rm -rf html
-mkdoc src/doc --output=html --format=html,tut || exit 1
