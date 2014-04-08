@@ -624,6 +624,56 @@ cmd_test()
 }
 
 ##
+# cmd_test_add
+# Adds the given tests to the current build system, verifying that they have
+# not previously been installed.
+# Parameters
+# string params
+# The set of parameters to the command, generally '$@'.
+#.
+
+cmd_test_add()
+{
+	help="" ; force=""
+	eval `getopt_long f? f,force ?,help -- "$@"`
+	if [ -n "$err" ] ; then echo "$err" ; exit 1 ; fi
+
+	if [ "$help" ] ; then
+cat <<USAGE
+	usage: bmake install [-f | --force]
+	Options
+	-f, --force Forces all files to be installed overwriting existing files
+	--help Produce this help message
+USAGE
+		exit 0
+	fi
+
+	test -z "$force" && test ! -d mktests && echo "bmake build system not detected, aborting" >&2 && exit 1
+
+	for name in "$@"
+	do
+		test -z "${name%%-*}" && continue
+
+		match=""
+		for file in "$sharedir"/mktests/*
+		do
+			if [ "${file##*/[0-9][0-9]-}" = "$name" ] ; then
+			match="${file#"$sharedir/"}" ; break
+			fi
+		done
+
+		test -z "$match" && echo "test '$name' not found, aborting" >&2 && exit 1
+
+		if [ ! "$force" ] && [ -f "$match" ] ; then
+			echo "test '$name' already exists, skipping"
+		else
+			copyfile "$match" 0755
+			echo "installed test '$name'"
+		fi
+	done
+}
+
+##
 # cmd Function
 #   Process any passed commands.
 #.
@@ -638,9 +688,9 @@ cmd()
 	cmd=$1 ; shift
 
 	case "$cmd" in
-		install | update ) "cmd_$cmd" "$@" ;;
+		install | update | test ) "cmd_$cmd" "$@" ;;
 		
-		target | test )
+		target )
 			"${cmd}cmd" "$@" ;;
 		
 		help | -? | --help)

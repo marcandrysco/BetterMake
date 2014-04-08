@@ -2,7 +2,7 @@ BIN = $(bmake_PATH_BIN)
 SHARE = $(bmake_PATH_SHARE)
 
 APPNAME = bmake
-VERSION = 0.4.0-alpha
+VERSION = 0.5.0-alpha
 DISTNAME= $(APPNAME)-$(VERSION)
 
 
@@ -34,9 +34,6 @@ user-dist:
 	tar -zcf $(DISTNAME).tar.gz $(DISTNAME)/
 	tar -jcf $(DISTNAME).tar.bz2 $(DISTNAME)/
 	rm -rf $(DISTNAME)
-
-doc-tut:
-	cd doc/tut ; ./build 
 
 
 clean: user-clean

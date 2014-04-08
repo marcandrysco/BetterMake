@@ -1,5 +1,5 @@
 Package	"bmake"
-Version	"0.99.1"
+Version	"0.5.0"
 
 Extra	"bmake"
 
@@ -11,8 +11,3 @@ Extra	"share/mktests/10-sanity"
 Extra	"share/mktests/20-restrict"
 Extra	"share/mktests/40-shared"
 Extra	"share/mktests/45-visibility"
-
-Extra	"doc/tut/build"
-Extra	"doc/tut/src/doc"
-Extra	"doc/tut/src/basics/index"
-Extra	"doc/tut/src/basics/hello"
